@@ -417,8 +417,8 @@ const OBS = new Astronomy.Observer(PARAMS.lat, PARAMS.lon, PARAMS.alt);
 const dayStartUTC = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 0, 0, 0));
 const dayStartTime = Astronomy.MakeTime(dayStartUTC);
   
-// console.log("dayStartUTC", dayStartUTC, "isDate", dayStartUTC instanceof Date, "isValid", !isNaN(dayStartUTC));
-// console.log("dayStartTime", dayStartTime, "ut", dayStartTime && dayStartTime.ut);
+console.log("dayStartUTC", dayStartUTC, "isDate", dayStartUTC instanceof Date, "isValid", !isNaN(dayStartUTC));
+console.log("dayStartTime", dayStartTime, "ut", dayStartTime && dayStartTime.ut);
 
 // 1) Info eclipsi local (depèn del lloc)
 const ECL = Astronomy.SearchLocalSolarEclipse(OBS, dayStartTime);
