@@ -9,6 +9,7 @@ const CACHE_FILES = [
   "./data/horizon_profiles/perfil_demo.json",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
+  "./visor.html",
 ];
 
 self.addEventListener("install", (event) => {
