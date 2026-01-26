@@ -335,20 +335,21 @@ function astroTimeToDate(t){
 function toAstroTime(x){
   if(!x) return null;
 
-  // wrappers típics: { time: AstroTime }
-  if(x.time) x = x.time;
+  // wrapper típic d'events: { time: AstroTime }
+  if (x.time && typeof x.time.ut === "number") return x.time;
 
-  // AstroTime típic: té .ut
-  if(typeof x.ut === "number") return x;
+  // ja és AstroTime
+  if (typeof x.ut === "number") return x;
 
   // Date
-  if(x instanceof Date) return Astronomy.MakeTime(x);
+  if (x instanceof Date) return Astronomy.MakeTime(x);
 
-  // alguns wrappers porten .date
-  if(x.date instanceof Date) return Astronomy.MakeTime(x.date);
+  // wrapper amb .date (Date)
+  if (x.date instanceof Date) return Astronomy.MakeTime(x.date);
 
   return null;
 }
+
 
 function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, centerHHMM, minutesBefore=120, minutesAfter=120, stepSec=60){
   const obs = new Astronomy.Observer(observerLat, observerLon, observerAltM);
@@ -414,6 +415,12 @@ const OBS = new Astronomy.Observer(PARAMS.lat, PARAMS.lon, PARAMS.alt);
 // Data base (00:00 UTC del dia)
 const dayStartUTC = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 0, 0, 0));
 const dayStartTime = Astronomy.MakeTime(dayStartUTC);
+  
+console.log("dayStartUTC", dayStartUTC, "isDate", dayStartUTC instanceof Date, "isValid", !isNaN(dayStartUTC));
+console.log("dayStartTime", dayStartTime, "ut", dayStartTime && dayStartTime.ut);
+
+console.log("dayMidUTC", dayMidUTC, "isDate", dayMidUTC instanceof Date, "isValid", !isNaN(dayMidUTC));
+console.log("dayMidTime", dayMidTime, "ut", dayMidTime && dayMidTime.ut);
 
 // 1) Info eclipsi local (depèn del lloc)
 const ECL = Astronomy.SearchLocalSolarEclipse(OBS, dayStartTime);
@@ -428,27 +435,34 @@ const sunSetTime = Astronomy.SearchRiseSet("Sun", OBS, -1, dayMidTime, 1);
 // 3) Punts del camí del Sol (com ja feies)
 let sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
 autoAltRange(sunPts);
-const sunAtCenter = (ECL && ECL.peak && ECL.peak.time)
-  ? sunHorAtAstroTime(ECL.peak.time, OBS)
-  : sunPts[Math.floor(sunPts.length/2)];
-const MARKS = [];
 
-// C1 (primer contacte): ECL.partial_begin
+// 🔒 asseguram que mai sigui null
+const peakPt = (ECL && ECL.peak && ECL.peak.time)
+  ? sunHorAtAstroTime(ECL.peak.time, OBS)
+  : null;
+
+const sunAtCenter = peakPt || sunPts[Math.floor(sunPts.length/2)];
+
+const MARKS = [];
+console.log("sunAtCenter", sunAtCenter);
+
+
+// C1
 if(ECL && ECL.partial_begin && ECL.partial_begin.time){
   const p = sunHorAtAstroTime(ECL.partial_begin.time, OBS);
-  MARKS.push({ ...p, label: `C1 ${fmtHHMM(ECL.partial_begin.time)}`, color: "rgba(255,200,0,0.95)" });
+  if(p) MARKS.push({ ...p, label: `C1 ${fmtHHMM(ECL.partial_begin.time)}`, color: "rgba(255,200,0,0.95)" });
 }
 
-// Màxim: ECL.peak
+// Màxim
 if(ECL && ECL.peak && ECL.peak.time){
   const p = sunHorAtAstroTime(ECL.peak.time, OBS);
-  MARKS.push({ ...p, label: `Màxim ${fmtHHMM(ECL.peak.time)}`, color: "rgba(0,200,255,0.95)" });
+  if(p) MARKS.push({ ...p, label: `Màxim ${fmtHHMM(ECL.peak.time)}`, color: "rgba(0,200,255,0.95)" });
 }
 
 // Posta
 if(sunSetTime){
   const p = sunHorAtAstroTime(sunSetTime, OBS);
-  MARKS.push({ ...p, label: `Posta ${fmtHHMM(sunSetTime)}`, color: "rgba(255,120,120,0.95)" });
+  if(p) MARKS.push({ ...p, label: `Posta ${fmtHHMM(sunSetTime)}`, color: "rgba(255,120,120,0.95)" });
 }
 
 
