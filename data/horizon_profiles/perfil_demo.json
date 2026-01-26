@@ -1,28 +1,14 @@
-(() => {
-  const az0 = 220;
-  const azMax = 300;
-  const daz = 0.2;
-  const n = Math.round((azMax - az0) / daz) + 1;
-
-  const alt = Array.from({length: n}, (_, i) => {
-    const az = az0 + i*daz;
-
-    // perfil inventat però “realista”: base + ondulació + una “muntanya”
-    const base = 0.7;
-    const und1 = 0.35 * Math.sin((az - 220)/7);
-    const und2 = 0.20 * Math.sin((az - 220)/2.8);
-
-    // pic principal al voltant de 262° (muntanya)
-    const peak = 6.0 * Math.exp(-0.5 * Math.pow((az - 262)/5.5, 2));
-
-    // un segon turonet petit cap a 285°
-    const bump = 1.8 * Math.exp(-0.5 * Math.pow((az - 285)/4.0, 2));
-
-    return +(base + und1 + und2 + peak + bump).toFixed(3);
-  });
-
-  const json = { az0, daz, alt };
-
-  console.log("Generated:", json.az0, json.daz, json.alt.length);
-  console.log(JSON.stringify(json, null, 2));
-})();
+{
+  "az0": 220,
+  "daz": 1,
+  "alt": [
+    0.600, 0.650, 0.698, 0.742, 0.781, 0.813, 0.838, 0.854, 0.861, 0.858,
+    0.845, 0.823, 0.792, 0.755, 0.713, 0.668, 0.622, 0.577, 0.535, 0.497,
+    0.466, 0.442, 0.427, 0.422, 0.427, 0.442, 0.467, 0.503, 0.549, 0.605,
+    0.672, 0.749, 0.839, 0.942, 1.060, 1.197, 1.358, 1.553, 1.793, 2.092,
+    2.463, 2.921, 3.481, 4.154, 4.945, 5.845, 6.825, 7.831, 8.789, 9.612,
+    10.214, 10.521, 10.491, 10.124, 9.463, 8.581, 7.563, 6.493, 5.438, 4.440,
+    3.519, 2.683, 1.932, 1.263, 0.672, 0.152, -0.305, -0.709, -1.070, -1.396,
+    -1.695, -1.972, -2.234, -2.485, -2.727, -2.959, -3.179, -3.383, -3.566
+  ]
+}
