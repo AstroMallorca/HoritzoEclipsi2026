@@ -456,9 +456,15 @@ if(ECL && ECL.peak && ECL.peak.time){
 }
 
 // Posta
-if(sunSetTime){
-  const p = sunHorAtAstroTime(sunSetTime, OBS);
-  if(p) MARKS.push({ ...p, label: `Posta ${fmtHHMM(sunSetTime)}`, color: "rgba(255,120,120,0.95)" });
+if (sunSetTime && sunSetTime.time) {
+  const p = sunHorAtAstroTime(sunSetTime.time, OBS);
+  if (p) {
+    MARKS.push({
+      ...p,
+      label: `Posta ${fmtHHMM(sunSetTime.time)}`,
+      color: "rgba(255,120,120,0.95)"
+    });
+  }
 }
 
 
