@@ -13,6 +13,8 @@
       background:rgba(0,0,0,.45); padding:10px 12px; border-radius:10px;
       backdrop-filter: blur(6px);
       font-size:14px; line-height:1.25;
+      max-width: calc(100vw - 24px);
+      box-sizing: border-box;
     }
   </style>
 </head>
@@ -21,11 +23,11 @@
   <canvas id="c"></canvas>
   <div class="hud" id="hud">—</div>
 </div>
+
 <script src="js/astronomy.browser.min.js"></script>
 <script>
 /**
  * CONFIG
- * - ajusta el rang d'azimut i d'altura a la teva UI
  */
 const VIEW = {
   azMin: 220,
@@ -207,20 +209,15 @@ function horizonAtAz(profile, az){
   if(i0 < 0 || i0+1 >= profile.alt.length) return null;
   return profile.alt[i0]*(1-t) + profile.alt[i0+1]*t;
 }
+
+/** Auto zoom vertical perquè no quedi tot concentrat a baix */
 function autoAltRange(points){
   let maxAlt = 0;
   for(const p of points) maxAlt = Math.max(maxAlt, p.alt);
-  VIEW.altMin = -1;
+
+  VIEW.altMin = -1; // una mica per sota de l'horitzó
   VIEW.altMax = Math.max(10, Math.ceil(maxAlt + 3));
 }
-const demoSun1 = demoSunPath();
-autoAltRange(demoSun1);
-
-const demoSunAtMax = {az:270, alt:2.0};
-
-window.addEventListener("resize", ()=>render(demoProfile, demoSun1, null, demoSunAtMax));
-render(demoProfile, demoSun1, null, demoSunAtMax);
-
 
 /** Render principal */
 function render(profile, sunPoints1, sunPoints2, sunAtMax){
@@ -279,11 +276,20 @@ function demoSunPath(){
   pts.push({az:275, alt:2.0, label:"22:43"});
   return pts;
 }
+
 const demoSun1 = demoSunPath();
+autoAltRange(demoSun1);
+
 const demoSunAtMax = {az:270, alt:2.0}; // màxim a 2°
 
-window.addEventListener("resize", ()=>render(demoProfile, demoSun1, null, demoSunAtMax));
-render(demoProfile, demoSun1, null, demoSunAtMax);
+function rerender(){
+  // si en el futur canvies demoSun1, aquí pots tornar a cridar autoAltRange
+  render(demoProfile, demoSun1, null, demoSunAtMax);
+}
+
+window.addEventListener("resize", rerender);
+rerender();
 </script>
 </body>
 </html>
+
