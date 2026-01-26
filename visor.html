@@ -333,6 +333,7 @@ async function loadProfile(){
   if(!r.ok) throw new Error("HTTP " + r.status);
   return await r.json();
 }
+
 function normalizeProfile(p){
   if(!p || typeof p !== "object") return null;
 
@@ -343,25 +344,6 @@ function normalizeProfile(p){
   if(Number.isFinite(az0) && Number.isFinite(daz) && alt) {
     return { az0, daz, alt };
   }
-  return null;
-}
-
-
-  // format esperat
-  if(Number.isFinite(p.az0) && Number.isFinite(p.daz) && Array.isArray(p.alt)) {
-    return p;
-  }
-
-  // format alternatiu: azMin + daz
-  if(Number.isFinite(p.azMin) && Number.isFinite(p.daz) && Array.isArray(p.alt)) {
-    return { az0: p.azMin, daz: p.daz, alt: p.alt };
-  }
-
-  // format alternatiu: altitudes
-  if(Number.isFinite(p.az0) && Number.isFinite(p.daz) && Array.isArray(p.altitudes)) {
-    return { az0: p.az0, daz: p.daz, alt: p.altitudes };
-  }
-
   return null;
 }
 
