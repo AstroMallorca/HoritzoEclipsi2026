@@ -376,11 +376,9 @@ function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, cente
 }
 function fmtHHMM(x){
   const t = toAstroTime(x);
-  if(!t || typeof t.toDate !== "function") return "—";
-  return t.toDate().toISOString().slice(11,16);
+  const d = astroTimeToDate(t);
+  return d ? d.toISOString().slice(11,16) : "—";
 }
-
-
 
 function sunHorAtDateUTC(dateObj, obs){
   const time = Astronomy.MakeTime(dateObj);
@@ -428,7 +426,7 @@ const dayMidUTC  = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 12, 0, 0));
 const dayMidTime = Astronomy.MakeTime(dayMidUTC);
 
 // millor: SearchAltitude perquè tu vols explícitament -0.833
-const sunSetTime = Astronomy.SearchAltitude("Sun", OBS, dayMidTime, +1, -0.833);
+const sunSetTime = Astronomy.SearchAltitude("Sun", OBS, +1, dayMidTime, 1, -0.833);
 
 
 // 3) Punts del camí del Sol (com ja feies)
