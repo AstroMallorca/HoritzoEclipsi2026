@@ -335,6 +335,17 @@ async function loadProfile(){
 function normalizeProfile(p){
   if(!p || typeof p !== "object") return null;
 
+  const az0 = Number(p.az0 ?? p.azMin);
+  const daz = Number(p.daz);
+  const alt = Array.isArray(p.alt) ? p.alt : (Array.isArray(p.altitudes) ? p.altitudes : null);
+
+  if(Number.isFinite(az0) && Number.isFinite(daz) && alt) {
+    return { az0, daz, alt };
+  }
+  return null;
+}
+
+
   // format esperat
   if(Number.isFinite(p.az0) && Number.isFinite(p.daz) && Array.isArray(p.alt)) {
     return p;
@@ -390,8 +401,18 @@ window.addEventListener("resize", render);
     console.warn("Perfil no carregat, usant fallback", e);
     CURRENT_PROFILE = profileFallback;
   }
+
+  // 🔎 DEBUG AQUÍ
+  console.log(
+    "PROFILE",
+    CURRENT_PROFILE.az0,
+    CURRENT_PROFILE.daz,
+    CURRENT_PROFILE.alt.length
+  );
+
   render();
 })();
+
 </script>
 
 <script>
