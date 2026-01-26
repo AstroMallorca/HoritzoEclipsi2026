@@ -1,5 +1,28 @@
-{
-  "az0": 220,
-  "daz": 0.2,
-  "alt": [0.7, 0.71, 0.72, 0.73, 0.74]
-}
+(() => {
+  const az0 = 220;
+  const azMax = 300;
+  const daz = 0.2;
+  const n = Math.round((azMax - az0) / daz) + 1;
+
+  const alt = Array.from({length: n}, (_, i) => {
+    const az = az0 + i*daz;
+
+    // perfil inventat però “realista”: base + ondulació + una “muntanya”
+    const base = 0.7;
+    const und1 = 0.35 * Math.sin((az - 220)/7);
+    const und2 = 0.20 * Math.sin((az - 220)/2.8);
+
+    // pic principal al voltant de 262° (muntanya)
+    const peak = 6.0 * Math.exp(-0.5 * Math.pow((az - 262)/5.5, 2));
+
+    // un segon turonet petit cap a 285°
+    const bump = 1.8 * Math.exp(-0.5 * Math.pow((az - 285)/4.0, 2));
+
+    return +(base + und1 + und2 + peak + bump).toFixed(3);
+  });
+
+  const json = { az0, daz, alt };
+
+  console.log("Generated:", json.az0, json.daz, json.alt.length);
+  console.log(JSON.stringify(json, null, 2));
+})();
