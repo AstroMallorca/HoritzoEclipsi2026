@@ -329,6 +329,23 @@ function astroTimeToDate(t){
   if(typeof t.toDate === "function") return t.toDate();
   return null;
 }
+function toAstroTime(x){
+  if(!x) return null;
+
+  // wrappers típics: { time: AstroTime }
+  if(x.time) x = x.time;
+
+  // AstroTime típic: té .ut
+  if(typeof x.ut === "number") return x;
+
+  // Date
+  if(x instanceof Date) return Astronomy.MakeTime(x);
+
+  // alguns wrappers porten .date
+  if(x.date instanceof Date) return Astronomy.MakeTime(x.date);
+
+  return null;
+}
 
 function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, centerHHMM, minutesBefore=120, minutesAfter=120, stepSec=60){
   const obs = new Astronomy.Observer(observerLat, observerLon, observerAltM);
@@ -353,10 +370,12 @@ function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, cente
   }
   return pts;
 }
-function fmtHHMM(dateObj){
-  // mostra HH:MM en UTC
-  return dateObj.toISOString().slice(11,16);
+function fmtHHMM(x){
+  // accepta Date o AstroTime
+  const d = (x instanceof Date) ? x : astroTimeToDate(x);
+  return d ? d.toISOString().slice(11,16) : "??:??";
 }
+
 
 function sunHorAtDateUTC(dateObj, obs){
   const time = Astronomy.MakeTime(dateObj);
@@ -368,15 +387,20 @@ function sunHorAtDateUTC(dateObj, obs){
   return { az, alt: hor.altitude, time };
 }
 
-function sunHorAtAstroTime(t, obs){
-  // t és AstroTime
+function sunHorAtAstroTime(x, obs){
+  const t = toAstroTime(x);
+  if(!t) return null;
+
   const eq = Astronomy.Equator("Sun", t, obs, true, true);
   const hor = Astronomy.Horizon(t, obs, eq.ra, eq.dec, "normal");
+
   let az = hor.azimuth;
   if(az < 0) az += 360;
   if(az >= 360) az -= 360;
+
   return { az, alt: hor.altitude, time: t };
 }
+
 
 // construeix punts reals del Sol
 const ymd = parseDateYMD(PARAMS.date) || {y:2026, mo:8, d:12};
@@ -408,21 +432,21 @@ const MARKS = [];
 
 // C1 (primer contacte): ECL.partial_begin
 if(ECL && ECL.partial_begin && ECL.partial_begin.time){
-  const p = sunHorAtAstroTime(ECL.partial_begin.time, OBS);
-  MARKS.push({ ...p, label: `C1 ${fmtHHMM(ECL.partial_begin.time.date)}`, color: "rgba(255,200,0,0.95)" });
-}
+ const p = sunHorAtAstroTime(ECL.partial_begin.time, OBS);
+if(p) MARKS.push({ ...p, label:`C1 ${fmtHHMM(p.time)}`, color:"rgba(255,200,0,0.95)" });
+
 
 // Màxim: ECL.peak
 if(ECL && ECL.peak && ECL.peak.time){
-  const p = sunHorAtAstroTime(ECL.peak.time, OBS);
-  MARKS.push({ ...p, label: `Màxim ${fmtHHMM(ECL.peak.time.date)}`, color: "rgba(0,200,255,0.95)" });
-}
+const p = sunHorAtAstroTime(ECL.peak.time, OBS);
+if(p) MARKS.push({ ...p, label:`Màxim ${fmtHHMM(p.time)}`, color:"rgba(0,200,255,0.95)" });
+
 
 // Posta
 if(sunSetTime){
-  const p = sunHorAtAstroTime(sunSetTime, OBS);
-  MARKS.push({ ...p, label: `Posta ${fmtHHMM(sunSetTime.date)}`, color: "rgba(255,120,120,0.95)" });
-}
+const p = sunHorAtAstroTime(sunSetTime, OBS);
+if(p) MARKS.push({ ...p, label:`Posta ${fmtHHMM(p.time)}`, color:"rgba(255,120,120,0.95)" });
+
 
 
 /* ============
