@@ -213,7 +213,14 @@ function autoAltRange(points){
   VIEW.altMin = -1;
   VIEW.altMax = Math.max(10, Math.ceil(maxAlt + 3));
 }
+const demoSun1 = demoSunPath();
 autoAltRange(demoSun1);
+
+const demoSunAtMax = {az:270, alt:2.0};
+
+window.addEventListener("resize", ()=>render(demoProfile, demoSun1, null, demoSunAtMax));
+render(demoProfile, demoSun1, null, demoSunAtMax);
+
 
 /** Render principal */
 function render(profile, sunPoints1, sunPoints2, sunAtMax){
