@@ -293,7 +293,7 @@ function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, cente
     const time = Astronomy.MakeTime(new Date(tMs));
 
     const eq = Astronomy.Equator("Sun", time, obs, true, true);
-    const hor = Astronomy.Horizon(time, obs, eq.ra, eq.dec, true);
+    const hor = Astronomy.Horizon(time, obs, eq.ra, eq.dec, "normal");
 
     let az = hor.azimuth;
     if(az < 0) az += 360;
