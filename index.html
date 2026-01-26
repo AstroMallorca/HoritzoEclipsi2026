@@ -159,7 +159,21 @@ function drawSunPath(W,H, points, color){
     const y = mapY(p.alt, H);
     if(!started){ ctx.moveTo(x,y); started=true; }
     else ctx.lineTo(x,y);
-  }
+  let prev = null;
+for (const p of points){
+  const ok = inViewAz(p.az) && inViewAlt(p.alt);
+  if(!ok){ prev = null; continue; }
+
+  // si hi ha un salt gros d'azimut, trenca el traç
+  if(prev && Math.abs(p.az - prev.az) > 5) prev = null;
+
+  const x = mapX(p.az, W), y = mapY(p.alt, H);
+  if(!started || !prev){ ctx.moveTo(x,y); started = true; }
+  else ctx.lineTo(x,y);
+
+  prev = p;
+}
+
   ctx.stroke();
 
   // Marques d'hora (cada 30 min per exemple) + etiqueta
