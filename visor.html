@@ -3,47 +3,108 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Horitzó + Sol</title>
+  <title>Visor Horitzó</title>
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#000000">
 
-  <!-- iOS -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Horitzó 2026">
-  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-
   <style>
-    /* el teu CSS */
+    body{ margin:0; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;}
+    #wrap{ position:relative; height:100vh; width:100vw; overflow:hidden; }
+    canvas{ width:100%; height:100%; display:block; }
+
+    .hud{
+      position:absolute; left:12px; bottom:12px;
+      background:rgba(0,0,0,.45); padding:10px 12px; border-radius:10px;
+      backdrop-filter: blur(6px);
+      font-size:14px; line-height:1.25;
+      max-width: calc(100vw - 24px);
+      box-sizing: border-box;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topbar{
+      position:absolute; left:12px; top:12px;
+      display:flex; gap:10px; align-items:center;
+      background:rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.12);
+      padding:8px 10px; border-radius:12px;
+      backdrop-filter: blur(6px);
+    }
+    .btn{
+      appearance:none; border:1px solid rgba(255,255,255,.18);
+      background:transparent; color:#fff;
+      padding:8px 10px; border-radius:10px;
+      font-size:14px; cursor:pointer;
+    }
+    .meta{
+      color:rgba(255,255,255,.75);
+      font-size:13px;
+    }
   </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="c"></canvas>
-  <div class="hud" id="hud">—</div>
+
+  <div class="topbar">
+    <button class="btn" id="backBtn">← Tornar</button>
+    <div class="meta" id="meta">—</div>
+  </div>
+
+  <div class="hud" id="hud">Carregant…</div>
 </div>
 
 <script src="js/astronomy.browser.min.js"></script>
 <script>
-/**
- * CONFIG
- */
+/* ============
+   PARÀMETRES
+   ============ */
+function numParam(name, fallback=null){
+  const p = new URLSearchParams(location.search);
+  const v = p.get(name);
+  if(v == null) return fallback;
+  const x = parseFloat(String(v).replace(",", "."));
+  return Number.isFinite(x) ? x : fallback;
+}
+
+const PARAMS = {
+  lat: numParam("lat", null),
+  lon: numParam("lon", null),
+  alt: numParam("alt", 0),
+  rangeKm: numParam("rangeKm", 200)
+};
+
+// si no venen coords (obert directament), posa una demo
+if(PARAMS.lat == null || PARAMS.lon == null){
+  PARAMS.lat = 39.5733;
+  PARAMS.lon = 2.6564;
+}
+
+document.getElementById("meta").textContent =
+  `lat ${PARAMS.lat.toFixed(4)}, lon ${PARAMS.lon.toFixed(4)}, alt ${Math.round(PARAMS.alt)} m · rang ${Math.round(PARAMS.rangeKm)} km`;
+
+document.getElementById("backBtn").addEventListener("click", () => {
+  location.href = "index.html";
+});
+
+/* ============
+   CONFIG VIEW
+   ============ */
 const VIEW = {
   azMin: 220,
   azMax: 300,
   altMin: 0,
   altMax: 25,
   padding: {l: 40, r: 14, t: 14, b: 34},
-  gridAzStep: 10,   // graus
-  gridAltStep: 5,   // graus
-  // colors (similar al look de la captura)
+  gridAzStep: 10,
+  gridAltStep: 5,
+
   colGrid: "rgba(255,0,180,0.35)",
   colGridBold: "rgba(255,0,180,0.55)",
   colHorizon: "rgba(255,255,255,0.9)",
-  colSunPath: "rgba(255,200,0,0.95)",   // groc
-  colSunPath2: "rgba(0,180,255,0.95)",  // blau (si vols 2a línia)
+  colSunPath: "rgba(255,200,0,0.95)",
   colText: "rgba(255,0,180,0.9)"
 };
 
@@ -51,7 +112,9 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
 
-/** Helpers mapping (az,alt) -> (x,y) */
+/* ============
+   HELPERS
+   ============ */
 function resizeCanvas(){
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   const w = Math.floor(canvas.clientWidth * dpr);
@@ -59,7 +122,7 @@ function resizeCanvas(){
   if(canvas.width !== w || canvas.height !== h){
     canvas.width = w; canvas.height = h;
   }
-  return {w,h,dpr};
+  return {w,h};
 }
 function mapX(az, W){
   const {l,r} = VIEW.padding;
@@ -70,20 +133,18 @@ function mapX(az, W){
 }
 function mapY(alt, H){
   const {t,b} = VIEW.padding;
-  const y0 = H - b; // altMin
-  const y1 = t;     // altMax
+  const y0 = H - b;
+  const y1 = t;
   const tt = (alt - VIEW.altMin) / (VIEW.altMax - VIEW.altMin);
   return y0 - tt * (y0 - y1);
 }
 function inViewAz(az){ return az >= VIEW.azMin && az <= VIEW.azMax; }
 function inViewAlt(alt){ return alt >= VIEW.altMin && alt <= VIEW.altMax; }
 
-/** Dibuixa graella + etiquetes d'angles */
 function drawGrid(W,H){
   ctx.save();
   ctx.lineWidth = 1;
 
-  // Verticals (azimut)
   for(let az = Math.ceil(VIEW.azMin/VIEW.gridAzStep)*VIEW.gridAzStep; az <= VIEW.azMax; az += VIEW.gridAzStep){
     const x = mapX(az, W);
     const bold = (az % 20 === 0);
@@ -93,7 +154,6 @@ function drawGrid(W,H){
     ctx.lineTo(x, H - VIEW.padding.b);
     ctx.stroke();
 
-    // label a baix
     ctx.fillStyle = VIEW.colText;
     ctx.font = "14px system-ui";
     ctx.textAlign = "center";
@@ -101,7 +161,6 @@ function drawGrid(W,H){
     ctx.fillText(`${az.toFixed(0)}°`, x, H - 6);
   }
 
-  // Horitzontals (altura)
   for(let alt = Math.ceil(VIEW.altMin/VIEW.gridAltStep)*VIEW.gridAltStep; alt <= VIEW.altMax; alt += VIEW.gridAltStep){
     const y = mapY(alt, H);
     const bold = (alt % 10 === 0);
@@ -111,7 +170,6 @@ function drawGrid(W,H){
     ctx.lineTo(W - VIEW.padding.r, y);
     ctx.stroke();
 
-    // label a l'esquerra
     ctx.fillStyle = VIEW.colText;
     ctx.font = "14px system-ui";
     ctx.textAlign = "left";
@@ -122,7 +180,6 @@ function drawGrid(W,H){
   ctx.restore();
 }
 
-/** Dibuixa perfil d'horitzó (blanc) */
 function drawHorizon(W,H, profile){
   if(!profile) return;
   const {az0, daz, alt} = profile;
@@ -146,7 +203,6 @@ function drawHorizon(W,H, profile){
   ctx.restore();
 }
 
-/** Dibuixa trajectòria del Sol (polilínia) + marques d'hora */
 function drawSunPath(W, H, points, color){
   if(!points || !points.length) return;
 
@@ -161,8 +217,6 @@ function drawSunPath(W, H, points, color){
   for(const p of points){
     const ok = inViewAz(p.az) && inViewAlt(p.alt);
     if(!ok){ prev = null; continue; }
-
-    // si hi ha un salt gros d'azimut, trenca el traç
     if(prev && Math.abs(p.az - prev.az) > 5) prev = null;
 
     const x = mapX(p.az, W);
@@ -178,31 +232,9 @@ function drawSunPath(W, H, points, color){
   }
 
   ctx.stroke();
-
-  // Marques + etiqueta
-  ctx.fillStyle = color;
-  ctx.font = "16px system-ui";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-
-  for(const p of points){
-    if(!p.label) continue;
-    if(!inViewAz(p.az) || !inViewAlt(p.alt)) continue;
-
-    const x = mapX(p.az, W);
-    const y = mapY(p.alt, H);
-
-    ctx.beginPath();
-    ctx.arc(x, y, 3.2, 0, Math.PI*2);
-    ctx.fill();
-
-    ctx.fillText(p.label, x + 8, y);
-  }
-
   ctx.restore();
 }
 
-/** Troba horitzó a un azimut (interpolació lineal sobre profile) */
 function horizonAtAz(profile, az){
   const i = (az - profile.az0) / profile.daz;
   const i0 = Math.floor(i);
@@ -211,96 +243,97 @@ function horizonAtAz(profile, az){
   return profile.alt[i0]*(1-t) + profile.alt[i0+1]*t;
 }
 
-/** Auto zoom vertical perquè no quedi tot concentrat a baix */
 function autoAltRange(points){
   let maxAlt = 0;
   for(const p of points) maxAlt = Math.max(maxAlt, p.alt);
-
-  VIEW.altMin = -1; // una mica per sota de l'horitzó
+  VIEW.altMin = -1;
   VIEW.altMax = Math.max(10, Math.ceil(maxAlt + 3));
 }
 
-/** Render principal */
-function render(profile, sunPoints1, sunPoints2, sunAtMax){
-  const {w:W,h:H} = resizeCanvas();
-  ctx.clearRect(0,0,W,H);
-
-  // fons
-  ctx.fillStyle = "#111";
-  ctx.fillRect(0,0,W,H);
-
-  drawGrid(W,H);
-  drawHorizon(W,H, profile);
-  drawSunPath(W,H, sunPoints1, VIEW.colSunPath);
-  if(sunPoints2) drawSunPath(W,H, sunPoints2, VIEW.colSunPath2);
-
-  // HUD: clearance a l'azimut del màxim (si el tens)
-  if(profile && sunAtMax){
-    const hHor = horizonAtAz(profile, sunAtMax.az);
-    const delta = (hHor==null) ? null : (sunAtMax.alt - hHor);
-    const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
-    hud.textContent = `Az ${sunAtMax.az.toFixed(1)}° · Sol ${sunAtMax.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
-  }else{
-    hud.textContent = "—";
+/* ============
+   DEMO Sun (per ara)
+   ============ */
+function demoSunPath(){
+  const pts = [];
+  for(let t=0; t<=1; t+=0.01){
+    const az = 235 + 55*t;
+    const alt = 10 - 9*t;
+    pts.push({az, alt});
   }
+  return pts;
 }
+const demoSun1 = demoSunPath();
+autoAltRange(demoSun1);
+const demoSunAtMax = {az:270, alt:2.0};
 
-/* =========================
-   DEMO DATA (SUBSTITUEIX-HO)
-   ========================= */
-
-/** Exemple de perfil fictici (substitueix-ho pel teu JSON real) */
-const demoProfile = (() => {
+/* ============
+   PERFIL: fetch + fallback
+   ============ */
+const demoProfileFallback = (() => {
   const az0 = 220, daz = 0.2;
   const n = Math.round((300-220)/daz)+1;
   const alt = new Array(n).fill(0).map((_,i)=>{
     const az = az0 + i*daz;
-    // “muntanya” fictícia centrada a 262°
     const peak = 6 * Math.exp(-0.5*Math.pow((az-262)/6,2));
-    // ondulació suau
     return 0.6 + 0.4*Math.sin((az-220)/8) + peak;
   });
   return {az0,daz,alt};
 })();
 
-/** Exemple de sol fictici (substitueix per astronomy-engine) */
-function demoSunPath(){
-  const pts = [];
-  // trajectòria paramètrica (només per veure-ho pintat)
-  for(let t=0; t<=1; t+=0.01){
-    const az = 235 + 55*t;
-    const alt = 10 - 9*t; // baixa fins ~1°
-    pts.push({az, alt});
+async function loadProfile(){
+  // de moment sempre el demo; després ho farem per tiles segons lat/lon
+  const url = "data/horizon_profiles/perfil_demo.json";
+  const r = await fetch(url, {cache:"no-store"});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return await r.json();
+}
+
+/* ============
+   RENDER
+   ============ */
+let CURRENT_PROFILE = null;
+
+function render(){
+  const {w:W,h:H} = resizeCanvas();
+  ctx.clearRect(0,0,W,H);
+
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0,0,W,H);
+
+  drawGrid(W,H);
+  drawHorizon(W,H, CURRENT_PROFILE);
+  drawSunPath(W,H, demoSun1, VIEW.colSunPath);
+
+  if(CURRENT_PROFILE && demoSunAtMax){
+    const hHor = horizonAtAz(CURRENT_PROFILE, demoSunAtMax.az);
+    const delta = (hHor==null) ? null : (demoSunAtMax.alt - hHor);
+    const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
+    hud.textContent =
+      `lat ${PARAMS.lat.toFixed(4)} lon ${PARAMS.lon.toFixed(4)} · Az ${demoSunAtMax.az.toFixed(1)}° · Sol ${demoSunAtMax.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
+  }else{
+    hud.textContent = "Carregant perfil d'horitzó…";
   }
-  // labels d'exemple
-  pts.push({az:240, alt:6.5, label:"17:50"});
-  pts.push({az:275, alt:2.0, label:"22:43"});
-  return pts;
 }
 
-const demoSun1 = demoSunPath();
-autoAltRange(demoSun1);
+window.addEventListener("resize", render);
 
-const demoSunAtMax = {az:270, alt:2.0}; // màxim a 2°
-
-function rerender(){
-  // si en el futur canvies demoSun1, aquí pots tornar a cridar autoAltRange
-  render(demoProfile, demoSun1, null, demoSunAtMax);
-}
-
-window.addEventListener("resize", rerender);
-rerender();
+(async ()=>{
+  try{
+    CURRENT_PROFILE = await loadProfile();
+  }catch(e){
+    console.warn("No s'ha pogut carregar el perfil, usant fallback:", e);
+    CURRENT_PROFILE = demoProfileFallback;
+  }
+  render();
+})();
 </script>
-  <script>
+
+<script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js")
-      .then(reg => console.log("SW registrat", reg.scope))
-      .catch(err => console.error("SW error", err));
+    navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
   });
 }
 </script>
-
 </body>
 </html>
-
