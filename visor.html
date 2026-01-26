@@ -428,7 +428,7 @@ const dayMidUTC  = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 12, 0, 0));
 const dayMidTime = Astronomy.MakeTime(dayMidUTC);
 
 // millor: SearchAltitude perquè tu vols explícitament -0.833
-const sunSetTime = Astronomy.SearchAltitude("Sun", OBS, -1, dayMidTime, 1, -0.833);
+const sunSetTime = Astronomy.SearchAltitude("Sun", OBS, dayMidTime, +1, -0.833);
 
 
 // 3) Punts del camí del Sol (com ja feies)
