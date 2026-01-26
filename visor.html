@@ -418,25 +418,23 @@ const dayStartTime = Astronomy.MakeTime(dayStartUTC);
   
 console.log("dayStartUTC", dayStartUTC, "isDate", dayStartUTC instanceof Date, "isValid", !isNaN(dayStartUTC));
 console.log("dayStartTime", dayStartTime, "ut", dayStartTime && dayStartTime.ut);
-
-console.log("dayMidUTC", dayMidUTC, "isDate", dayMidUTC instanceof Date, "isValid", !isNaN(dayMidUTC));
 console.log("dayMidTime", dayMidTime, "ut", dayMidTime && dayMidTime.ut);
 
 // 1) Info eclipsi local (depèn del lloc)
 const ECL = Astronomy.SearchLocalSolarEclipse(OBS, dayStartTime);
 
-// 2) Posta de sol (Astronomy Engine ja usa l’estàndard de sunrise/sunset, equivalent a -0.833° + refracció)
-const dayMidUTC = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 12, 0, 0));
+// 2) Posta de sol (altitud aparent del centre del Sol a -0.833°, amb refracció "normal")
+const dayMidUTC  = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 12, 0, 0));
 const dayMidTime = Astronomy.MakeTime(dayMidUTC);
 
-const sunSetTime = Astronomy.SearchRiseSet("Sun", OBS, -1, dayMidTime, 1);
+// millor: SearchAltitude perquè tu vols explícitament -0.833
+const sunSetTime = Astronomy.SearchAltitude("Sun", OBS, -1, dayMidTime, 1, -0.833);
 
 
 // 3) Punts del camí del Sol (com ja feies)
 let sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
 autoAltRange(sunPts);
 
-// 🔒 asseguram que mai sigui null
 const peakPt = (ECL && ECL.peak && ECL.peak.time)
   ? sunHorAtAstroTime(ECL.peak.time, OBS)
   : null;
