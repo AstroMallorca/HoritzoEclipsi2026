@@ -6,6 +6,13 @@
   <title>Horitzó + Sol</title>
   <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#000000">
+  <!-- iOS: perquè es pugui "instal·lar" i obrir com app -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Horitzó 2026">
+
+<!-- iOS: icona (IMPORTANT: Apple NO usa les icons del manifest) -->
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <style>
     body{ margin:0; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;}
     #wrap{ position:relative; height:100vh; width:100vw; overflow:hidden; }
