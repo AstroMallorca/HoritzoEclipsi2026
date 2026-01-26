@@ -327,8 +327,8 @@ const profileFallback = (() => {
 })();
 
 async function loadProfile(){
-  const url = "data/horizon_profiles/perfil_demo.json";
-  const r = await fetch(url);
+  const url = "./data/horizon_profiles/perfil_demo.json";
+  const r = await fetch(url, {cache:"no-store"});
   if(!r.ok) throw new Error("HTTP " + r.status);
   return await r.json();
 }
