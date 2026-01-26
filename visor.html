@@ -80,10 +80,12 @@ const PARAMS = {
 if(PARAMS.lat == null || PARAMS.lon == null){
   PARAMS.lat = 39.5733;
   PARAMS.lon = 2.6564;
+  PARAMS.date = new URLSearchParams(location.search).get("date") || "2026-08-12";
+PARAMS.centerUtc = new URLSearchParams(location.search).get("centerUtc") || "18:30";
 }
 
 document.getElementById("meta").textContent =
-  `lat ${PARAMS.lat.toFixed(4)}, lon ${PARAMS.lon.toFixed(4)}, alt ${Math.round(PARAMS.alt)} m · rang ${Math.round(PARAMS.rangeKm)} km`;
+  `lat ${PARAMS.lat.toFixed(4)}, lon ${PARAMS.lon.toFixed(4)}, alt ${Math.round(PARAMS.alt)} m · ${PARAMS.date} ${PARAMS.centerUtc} UTC · rang ${Math.round(PARAMS.rangeKm)} km`;
 
 document.getElementById("backBtn").addEventListener("click", () => {
   location.href = "index.html";
@@ -253,18 +255,44 @@ function autoAltRange(points){
 /* ============
    DEMO Sun (per ara)
    ============ */
-function demoSunPath(){
+function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, centerHHMM, minutesBefore=120, minutesAfter=120, stepSec=60){
+  const obs = new Astronomy.Observer(observerLat, observerLon, observerAltM);
+
+  const centerDate = makeUtcDate(dateYMD, centerHHMM);
+  const startMs = centerDate.getTime() - minutesBefore*60*1000;
+  const endMs   = centerDate.getTime() + minutesAfter*60*1000;
+
   const pts = [];
-  for(let t=0; t<=1; t+=0.01){
-    const az = 235 + 55*t;
-    const alt = 10 - 9*t;
-    pts.push({az, alt});
+
+  for(let tMs = startMs; tMs <= endMs; tMs += stepSec*1000){
+    const time = Astronomy.MakeTime(new Date(tMs));
+
+    // Equator topocèntric del Sol
+    const eq = Astronomy.Equator("Sun", time, obs, true, true);
+
+    // Horitzó (az/alt). refraction=true per aproximació realista prop horitzó
+    const hor = Astronomy.Horizon(time, obs, eq.ra, eq.dec, true);
+
+    // Normalitza az [0..360)
+    let az = hor.azimuth;
+    if(az < 0) az += 360;
+    if(az >= 360) az -= 360;
+
+    pts.push({ az, alt: hor.altitude });
   }
+
   return pts;
 }
-const demoSun1 = demoSunPath();
-autoAltRange(demoSun1);
-const demoSunAtMax = {az:270, alt:2.0};
+
+// construeix punts reals
+const ymd = parseDateYMD(PARAMS.date) || {y:2026, mo:8, d:12};
+const hhmm = parseHHMM(PARAMS.centerUtc) || {hh:18, mm:30};
+
+const sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
+autoAltRange(sunPts);
+
+// Punt “central” (per HUD / càlcul)
+const sunAtCenter = sunPts[Math.floor(sunPts.length/2)];
 
 /* ============
    PERFIL: fetch + fallback
@@ -287,7 +315,26 @@ async function loadProfile(){
   if(!r.ok) throw new Error("HTTP " + r.status);
   return await r.json();
 }
+function parseDateYMD(s){
+  // "YYYY-MM-DD"
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
+  if(!m) return null;
+  const y = +m[1], mo = +m[2], d = +m[3];
+  return {y, mo, d};
+}
 
+function parseHHMM(s){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || ""));
+  if(!m) return null;
+  const hh = +m[1], mm = +m[2];
+  if(hh<0 || hh>23 || mm<0 || mm>59) return null;
+  return {hh, mm};
+}
+
+function makeUtcDate(ymd, hhmm){
+  // JS Date en UTC
+  return new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, hhmm.hh, hhmm.mm, 0));
+}
 /* ============
    RENDER
    ============ */
@@ -304,15 +351,17 @@ function render(){
   drawHorizon(W,H, CURRENT_PROFILE);
   drawSunPath(W,H, demoSun1, VIEW.colSunPath);
 
-  if(CURRENT_PROFILE && demoSunAtMax){
-    const hHor = horizonAtAz(CURRENT_PROFILE, demoSunAtMax.az);
-    const delta = (hHor==null) ? null : (demoSunAtMax.alt - hHor);
-    const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
-    hud.textContent =
-      `lat ${PARAMS.lat.toFixed(4)} lon ${PARAMS.lon.toFixed(4)} · Az ${demoSunAtMax.az.toFixed(1)}° · Sol ${demoSunAtMax.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
-  }else{
-    hud.textContent = "Carregant perfil d'horitzó…";
-  }
+ drawSunPath(W,H, sunPts, VIEW.colSunPath);
+
+if(CURRENT_PROFILE && sunAtCenter){
+  const hHor = horizonAtAz(CURRENT_PROFILE, sunAtCenter.az);
+  const delta = (hHor==null) ? null : (sunAtCenter.alt - hHor);
+  const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
+  hud.textContent =
+    `Az ${sunAtCenter.az.toFixed(1)}° · Sol ${sunAtCenter.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
+}else{
+  hud.textContent = "Carregant perfil d'horitzó…";
+}
 }
 
 window.addEventListener("resize", render);
