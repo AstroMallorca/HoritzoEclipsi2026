@@ -203,7 +203,7 @@ const centerUtcEl = document.getElementById("centerUtc");
   });
 
   // Validació live dels inputs
-  [latEl, lonEl, altEl, rangeEl].forEach(el => {
+  [latEl, lonEl, altEl, rangeEl, dateEl, centerUtcEl].forEach(el => {
     el.addEventListener("input", () => {
       if(chosen === "manual"){
         const v = validateManual();
