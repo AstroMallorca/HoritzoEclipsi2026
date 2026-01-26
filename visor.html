@@ -322,6 +322,13 @@ function parseHHMM(s){
 function makeUtcDate(ymd, hhmm){
   return new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, hhmm.hh, hhmm.mm, 0));
 }
+function astroTimeToDate(t){
+  // moltes builds tenen t.date; altres tenen t.toDate()
+  if(!t) return null;
+  if(t.date instanceof Date) return t.date;
+  if(typeof t.toDate === "function") return t.toDate();
+  return null;
+}
 
 function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, centerHHMM, minutesBefore=120, minutesAfter=120, stepSec=60){
   const obs = new Astronomy.Observer(observerLat, observerLon, observerAltM);
@@ -385,12 +392,18 @@ const dayStartTime = Astronomy.MakeTime(dayStartUTC);
 const ECL = Astronomy.SearchLocalSolarEclipse(OBS, dayStartTime);
 
 // 2) Posta de sol (Astronomy Engine ja usa l’estàndard de sunrise/sunset, equivalent a -0.833° + refracció)
-const sunSetTime = Astronomy.SearchRiseSet("Sun", OBS, -1, dayStartTime, 2);
+const dayMidUTC = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 12, 0, 0));
+const dayMidTime = Astronomy.MakeTime(dayMidUTC);
+
+const sunSetTime = Astronomy.SearchRiseSet("Sun", OBS, -1, dayMidTime, 1);
+
 
 // 3) Punts del camí del Sol (com ja feies)
 let sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
 autoAltRange(sunPts);
-const sunAtCenter = sunPts[Math.floor(sunPts.length/2)];
+const sunAtCenter = (ECL && ECL.peak && ECL.peak.time)
+  ? sunHorAtAstroTime(ECL.peak.time, OBS)
+  : sunPts[Math.floor(sunPts.length/2)];
 const MARKS = [];
 
 // C1 (primer contacte): ECL.partial_begin
@@ -465,8 +478,8 @@ function render(){
   
 
   if(CURRENT_PROFILE && sunAtCenter){
-    const hHor = horizonAtAz(CURRENT_PROFILE, sunAtCenter.az);
-    const delta = (hHor==null) ? null : (sunAtCenter.alt - hHor);
+   const hHor = horizonAtAz(CURRENT_PROFILE, sunAtCenter.az);
+const delta = (hHor==null) ? null : (sunAtCenter.alt - hHor);
     const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
     hud.textContent =
       `Az ${sunAtCenter.az.toFixed(1)}° · Sol ${sunAtCenter.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
