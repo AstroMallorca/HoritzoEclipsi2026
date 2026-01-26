@@ -144,7 +144,7 @@ function drawHorizon(W,H, profile){
 }
 
 /** Dibuixa trajectòria del Sol (polilínia) + marques d'hora */
-function drawSunPath(W,H, points, color){
+function drawSunPath(W, H, points, color){
   if(!points || !points.length) return;
 
   ctx.save();
@@ -153,30 +153,30 @@ function drawSunPath(W,H, points, color){
   ctx.beginPath();
 
   let started = false;
+  let prev = null;
+
   for(const p of points){
-    if(!inViewAz(p.az) || !inViewAlt(p.alt)) continue;
+    const ok = inViewAz(p.az) && inViewAlt(p.alt);
+    if(!ok){ prev = null; continue; }
+
+    // si hi ha un salt gros d'azimut, trenca el traç
+    if(prev && Math.abs(p.az - prev.az) > 5) prev = null;
+
     const x = mapX(p.az, W);
     const y = mapY(p.alt, H);
-    if(!started){ ctx.moveTo(x,y); started=true; }
-    else ctx.lineTo(x,y);
-  let prev = null;
-for (const p of points){
-  const ok = inViewAz(p.az) && inViewAlt(p.alt);
-  if(!ok){ prev = null; continue; }
 
-  // si hi ha un salt gros d'azimut, trenca el traç
-  if(prev && Math.abs(p.az - prev.az) > 5) prev = null;
-
-  const x = mapX(p.az, W), y = mapY(p.alt, H);
-  if(!started || !prev){ ctx.moveTo(x,y); started = true; }
-  else ctx.lineTo(x,y);
-
-  prev = p;
-}
+    if(!started || !prev){
+      ctx.moveTo(x, y);
+      started = true;
+    }else{
+      ctx.lineTo(x, y);
+    }
+    prev = p;
+  }
 
   ctx.stroke();
 
-  // Marques d'hora (cada 30 min per exemple) + etiqueta
+  // Marques + etiqueta
   ctx.fillStyle = color;
   ctx.font = "16px system-ui";
   ctx.textAlign = "left";
@@ -185,15 +185,14 @@ for (const p of points){
   for(const p of points){
     if(!p.label) continue;
     if(!inViewAz(p.az) || !inViewAlt(p.alt)) continue;
+
     const x = mapX(p.az, W);
     const y = mapY(p.alt, H);
 
-    // marker
     ctx.beginPath();
     ctx.arc(x, y, 3.2, 0, Math.PI*2);
     ctx.fill();
 
-    // label lleugerament separat
     ctx.fillText(p.label, x + 8, y);
   }
 
@@ -208,6 +207,13 @@ function horizonAtAz(profile, az){
   if(i0 < 0 || i0+1 >= profile.alt.length) return null;
   return profile.alt[i0]*(1-t) + profile.alt[i0+1]*t;
 }
+function autoAltRange(points){
+  let maxAlt = 0;
+  for(const p of points) maxAlt = Math.max(maxAlt, p.alt);
+  VIEW.altMin = -1;
+  VIEW.altMax = Math.max(10, Math.ceil(maxAlt + 3));
+}
+autoAltRange(demoSun1);
 
 /** Render principal */
 function render(profile, sunPoints1, sunPoints2, sunAtMax){
