@@ -375,8 +375,9 @@ function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, cente
   return pts;
 }
 function fmtHHMM(x){
-  const d = astroTimeToDate(x);
-  return d ? d.toISOString().slice(11,16) : "—";
+  const t = toAstroTime(x);
+  if(!t || typeof t.toDate !== "function") return "—";
+  return t.toDate().toISOString().slice(11,16);
 }
 
 
@@ -418,7 +419,6 @@ const dayStartTime = Astronomy.MakeTime(dayStartUTC);
   
 console.log("dayStartUTC", dayStartUTC, "isDate", dayStartUTC instanceof Date, "isValid", !isNaN(dayStartUTC));
 console.log("dayStartTime", dayStartTime, "ut", dayStartTime && dayStartTime.ut);
-console.log("dayMidTime", dayMidTime, "ut", dayMidTime && dayMidTime.ut);
 
 // 1) Info eclipsi local (depèn del lloc)
 const ECL = Astronomy.SearchLocalSolarEclipse(OBS, dayStartTime);
