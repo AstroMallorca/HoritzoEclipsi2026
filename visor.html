@@ -41,6 +41,10 @@
     .meta{
       color:rgba(255,255,255,.75);
       font-size:13px;
+      max-width: 70vw;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   </style>
 </head>
@@ -61,9 +65,13 @@
 /* ============
    PARÀMETRES
    ============ */
-function numParam(name, fallback=null){
+function getParam(name, fallback=null){
   const p = new URLSearchParams(location.search);
   const v = p.get(name);
+  return (v == null || v === "") ? fallback : v;
+}
+function numParam(name, fallback=null){
+  const v = getParam(name, null);
   if(v == null) return fallback;
   const x = parseFloat(String(v).replace(",", "."));
   return Number.isFinite(x) ? x : fallback;
@@ -73,15 +81,16 @@ const PARAMS = {
   lat: numParam("lat", null),
   lon: numParam("lon", null),
   alt: numParam("alt", 0),
-  rangeKm: numParam("rangeKm", 200)
+  rangeKm: numParam("rangeKm", 200),
+  date: getParam("date", "2026-08-12"),
+  centerUtc: getParam("centerUtc", "18:30")
 };
 
-// si no venen coords (obert directament), posa una demo
+// si s'obre directament sense coords, demo
 if(PARAMS.lat == null || PARAMS.lon == null){
   PARAMS.lat = 39.5733;
   PARAMS.lon = 2.6564;
-  PARAMS.date = new URLSearchParams(location.search).get("date") || "2026-08-12";
-PARAMS.centerUtc = new URLSearchParams(location.search).get("centerUtc") || "18:30";
+  PARAMS.alt = 0;
 }
 
 document.getElementById("meta").textContent =
@@ -253,8 +262,24 @@ function autoAltRange(points){
 }
 
 /* ============
-   DEMO Sun (per ara)
+   SOL REAL (Astronomy Engine)
    ============ */
+function parseDateYMD(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
+  if(!m) return null;
+  return {y:+m[1], mo:+m[2], d:+m[3]};
+}
+function parseHHMM(s){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || ""));
+  if(!m) return null;
+  const hh = +m[1], mm = +m[2];
+  if(hh<0 || hh>23 || mm<0 || mm>59) return null;
+  return {hh, mm};
+}
+function makeUtcDate(ymd, hhmm){
+  return new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, hhmm.hh, hhmm.mm, 0));
+}
+
 function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, centerHHMM, minutesBefore=120, minutesAfter=120, stepSec=60){
   const obs = new Astronomy.Observer(observerLat, observerLon, observerAltM);
 
@@ -267,37 +292,30 @@ function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, cente
   for(let tMs = startMs; tMs <= endMs; tMs += stepSec*1000){
     const time = Astronomy.MakeTime(new Date(tMs));
 
-    // Equator topocèntric del Sol
     const eq = Astronomy.Equator("Sun", time, obs, true, true);
-
-    // Horitzó (az/alt). refraction=true per aproximació realista prop horitzó
     const hor = Astronomy.Horizon(time, obs, eq.ra, eq.dec, true);
 
-    // Normalitza az [0..360)
     let az = hor.azimuth;
     if(az < 0) az += 360;
     if(az >= 360) az -= 360;
 
     pts.push({ az, alt: hor.altitude });
   }
-
   return pts;
 }
 
-// construeix punts reals
+// construeix punts reals del Sol
 const ymd = parseDateYMD(PARAMS.date) || {y:2026, mo:8, d:12};
 const hhmm = parseHHMM(PARAMS.centerUtc) || {hh:18, mm:30};
 
-const sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
+let sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
 autoAltRange(sunPts);
-
-// Punt “central” (per HUD / càlcul)
 const sunAtCenter = sunPts[Math.floor(sunPts.length/2)];
 
 /* ============
    PERFIL: fetch + fallback
    ============ */
-const demoProfileFallback = (() => {
+const profileFallback = (() => {
   const az0 = 220, daz = 0.2;
   const n = Math.round((300-220)/daz)+1;
   const alt = new Array(n).fill(0).map((_,i)=>{
@@ -309,32 +327,12 @@ const demoProfileFallback = (() => {
 })();
 
 async function loadProfile(){
-  // de moment sempre el demo; després ho farem per tiles segons lat/lon
   const url = "data/horizon_profiles/perfil_demo.json";
-  const r = await fetch(url, {cache:"no-store"});
+  const r = await fetch(url);
   if(!r.ok) throw new Error("HTTP " + r.status);
   return await r.json();
 }
-function parseDateYMD(s){
-  // "YYYY-MM-DD"
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
-  if(!m) return null;
-  const y = +m[1], mo = +m[2], d = +m[3];
-  return {y, mo, d};
-}
 
-function parseHHMM(s){
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || ""));
-  if(!m) return null;
-  const hh = +m[1], mm = +m[2];
-  if(hh<0 || hh>23 || mm<0 || mm>59) return null;
-  return {hh, mm};
-}
-
-function makeUtcDate(ymd, hhmm){
-  // JS Date en UTC
-  return new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, hhmm.hh, hhmm.mm, 0));
-}
 /* ============
    RENDER
    ============ */
@@ -349,19 +347,17 @@ function render(){
 
   drawGrid(W,H);
   drawHorizon(W,H, CURRENT_PROFILE);
-  drawSunPath(W,H, demoSun1, VIEW.colSunPath);
+  drawSunPath(W,H, sunPts, VIEW.colSunPath);
 
- drawSunPath(W,H, sunPts, VIEW.colSunPath);
-
-if(CURRENT_PROFILE && sunAtCenter){
-  const hHor = horizonAtAz(CURRENT_PROFILE, sunAtCenter.az);
-  const delta = (hHor==null) ? null : (sunAtCenter.alt - hHor);
-  const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
-  hud.textContent =
-    `Az ${sunAtCenter.az.toFixed(1)}° · Sol ${sunAtCenter.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
-}else{
-  hud.textContent = "Carregant perfil d'horitzó…";
-}
+  if(CURRENT_PROFILE && sunAtCenter){
+    const hHor = horizonAtAz(CURRENT_PROFILE, sunAtCenter.az);
+    const delta = (hHor==null) ? null : (sunAtCenter.alt - hHor);
+    const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
+    hud.textContent =
+      `Az ${sunAtCenter.az.toFixed(1)}° · Sol ${sunAtCenter.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
+  }else{
+    hud.textContent = "Carregant perfil d'horitzó…";
+  }
 }
 
 window.addEventListener("resize", render);
@@ -371,7 +367,7 @@ window.addEventListener("resize", render);
     CURRENT_PROFILE = await loadProfile();
   }catch(e){
     console.warn("No s'ha pogut carregar el perfil, usant fallback:", e);
-    CURRENT_PROFILE = demoProfileFallback;
+    CURRENT_PROFILE = profileFallback;
   }
   render();
 })();
@@ -386,3 +382,4 @@ if ("serviceWorker" in navigator) {
 </script>
 </body>
 </html>
+
