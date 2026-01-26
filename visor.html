@@ -246,6 +246,48 @@ function drawSunPath(W, H, points, color){
   ctx.stroke();
   ctx.restore();
 }
+function drawSunDiscs(W, H, marks){
+  if(!marks || !marks.length) return;
+
+  // radi solar aproximat en graus
+  const sunRadiusDeg = 0.266; // ~16 arcmin
+
+  const plotH = (H - VIEW.padding.t - VIEW.padding.b);
+  const rPx = sunRadiusDeg * (plotH / (VIEW.altMax - VIEW.altMin));
+
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.font = "15px system-ui";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+
+  for(const m of marks){
+    if(!inViewAz(m.az) || !inViewAlt(m.alt)) continue;
+
+    const x = mapX(m.az, W);
+    const y = mapY(m.alt, H);
+
+    ctx.strokeStyle = m.color || "rgba(255,255,255,0.9)";
+    ctx.fillStyle = ctx.strokeStyle;
+
+    // cercle (disc)
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(2, rPx), 0, Math.PI*2);
+    ctx.stroke();
+
+    // punt central
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI*2);
+    ctx.fill();
+
+    // etiqueta
+    if(m.label){
+      ctx.fillText(m.label, x + 10, y);
+    }
+  }
+
+  ctx.restore();
+}
 
 function horizonAtAz(profile, az){
   const i = (az - profile.az0) / profile.daz;
@@ -304,14 +346,71 @@ function buildRealSunPath(observerLat, observerLon, observerAltM, dateYMD, cente
   }
   return pts;
 }
+function fmtHHMM(dateObj){
+  // mostra HH:MM en UTC
+  return dateObj.toISOString().slice(11,16);
+}
+
+function sunHorAtDateUTC(dateObj, obs){
+  const time = Astronomy.MakeTime(dateObj);
+  const eq = Astronomy.Equator("Sun", time, obs, true, true);
+  const hor = Astronomy.Horizon(time, obs, eq.ra, eq.dec, "normal"); // refracció "normal"
+  let az = hor.azimuth;
+  if(az < 0) az += 360;
+  if(az >= 360) az -= 360;
+  return { az, alt: hor.altitude, time };
+}
+
+function sunHorAtAstroTime(t, obs){
+  // t és AstroTime
+  const eq = Astronomy.Equator("Sun", t, obs, true, true);
+  const hor = Astronomy.Horizon(t, obs, eq.ra, eq.dec, "normal");
+  let az = hor.azimuth;
+  if(az < 0) az += 360;
+  if(az >= 360) az -= 360;
+  return { az, alt: hor.altitude, time: t };
+}
 
 // construeix punts reals del Sol
 const ymd = parseDateYMD(PARAMS.date) || {y:2026, mo:8, d:12};
 const hhmm = parseHHMM(PARAMS.centerUtc) || {hh:18, mm:30};
 
+const OBS = new Astronomy.Observer(PARAMS.lat, PARAMS.lon, PARAMS.alt);
+
+// Data base (00:00 UTC del dia)
+const dayStartUTC = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 0, 0, 0));
+const dayStartTime = Astronomy.MakeTime(dayStartUTC);
+
+// 1) Info eclipsi local (depèn del lloc)
+const ECL = Astronomy.SearchLocalSolarEclipse(OBS, dayStartTime);
+
+// 2) Posta de sol (Astronomy Engine ja usa l’estàndard de sunrise/sunset, equivalent a -0.833° + refracció)
+const sunSetTime = Astronomy.SearchRiseSet("Sun", OBS, -1, dayStartTime, 2);
+
+// 3) Punts del camí del Sol (com ja feies)
 let sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
 autoAltRange(sunPts);
 const sunAtCenter = sunPts[Math.floor(sunPts.length/2)];
+const MARKS = [];
+
+// C1 (primer contacte): ECL.partial_begin
+if(ECL && ECL.partial_begin && ECL.partial_begin.time){
+  const p = sunHorAtAstroTime(ECL.partial_begin.time, OBS);
+  MARKS.push({ ...p, label: `C1 ${fmtHHMM(ECL.partial_begin.time.date)}`, color: "rgba(255,200,0,0.95)" });
+}
+
+// Màxim: ECL.peak
+if(ECL && ECL.peak && ECL.peak.time){
+  const p = sunHorAtAstroTime(ECL.peak.time, OBS);
+  MARKS.push({ ...p, label: `Màxim ${fmtHHMM(ECL.peak.time.date)}`, color: "rgba(0,200,255,0.95)" });
+}
+
+// Posta
+if(sunSetTime){
+  const p = sunHorAtAstroTime(sunSetTime, OBS);
+  MARKS.push({ ...p, label: `Posta ${fmtHHMM(sunSetTime.date)}`, color: "rgba(255,120,120,0.95)" });
+}
+
 
 /* ============
    PERFIL: fetch + fallback
@@ -362,6 +461,8 @@ function render(){
   drawGrid(W,H);
   drawHorizon(W,H, CURRENT_PROFILE);
   drawSunPath(W,H, sunPts, VIEW.colSunPath);
+  drawSunDiscs(W, H, MARKS);
+  
 
   if(CURRENT_PROFILE && sunAtCenter){
     const hHor = horizonAtAz(CURRENT_PROFILE, sunAtCenter.az);
