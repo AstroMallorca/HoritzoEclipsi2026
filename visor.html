@@ -123,6 +123,9 @@ const VIEW = {
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
+// ✅ globals (UNA sola vegada)
+let CURRENT_PROFILE = null;
+let BASE_AZ = null;
 
 /* ============
    HELPERS
@@ -534,8 +537,6 @@ if (VIEW.azMax - VIEW.azMin < 10) {
 /* ============
    RENDER
    ============ */
-let CURRENT_PROFILE = null;
-let BASE_AZ = null;
 
 function render(){
   if (!BASE_AZ) return;   // ✅ aquí sí
