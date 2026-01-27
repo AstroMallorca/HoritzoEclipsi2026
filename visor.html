@@ -425,7 +425,19 @@ const sunSetTime = Astronomy.SearchAltitude("Sun", OBS, -1, dayMidUTC, 1, -0.833
 
 // 3) Punts del camí del Sol (com ja feies)
 let sunPts = buildRealSunPath(PARAMS.lat, PARAMS.lon, PARAMS.alt, ymd, hhmm, 120, 120, 60);
-autoAltRange(sunPts);
+
+// ✅ RANG ALTITUD: de 0° fins C1 + 1°
+const c1Pt = (ECL && ECL.partial_begin && ECL.partial_begin.time)
+  ? sunHorAtAstroTime(ECL.partial_begin.time, OBS)
+  : null;
+
+// si per qualque motiu no hi ha C1, usam el punt central com a referència
+const refAlt = (c1Pt && Number.isFinite(c1Pt.alt))
+  ? c1Pt.alt
+  : sunPts[Math.floor(sunPts.length/2)].alt;
+
+VIEW.altMin = 0;
+VIEW.altMax = Math.max(5, Math.ceil(refAlt + 1));   // +1 grau “abans”
 
 const peakPt = (ECL && ECL.peak && ECL.peak.time)
   ? sunHorAtAstroTime(ECL.peak.time, OBS)
@@ -497,6 +509,23 @@ function normalizeProfile(p){
   }
   return null;
 }
+// ✅ RANG AZIMUT: de (C1 - 1°) fins (posta + 1°)
+const sunSetPt = (sunSetTime && sunSetTime.time)
+  ? sunHorAtAstroTime(sunSetTime.time, OBS)
+  : null;
+
+const refStartAz = (c1Pt && Number.isFinite(c1Pt.az)) ? c1Pt.az : sunPts[0].az;
+const refEndAz   = (sunSetPt && Number.isFinite(sunSetPt.az)) ? sunSetPt.az : sunPts[sunPts.length-1].az;
+
+VIEW.azMin = Math.floor(refStartAz - 1);
+VIEW.azMax = Math.ceil(refEndAz + 1);
+
+// seguretat: evita un camp massa estret
+if (VIEW.azMax - VIEW.azMin < 10) {
+  const mid = (VIEW.azMin + VIEW.azMax) / 2;
+  VIEW.azMin = Math.floor(mid - 5);
+  VIEW.azMax = Math.ceil(mid + 5);
+}
 
 /* ============
    RENDER
@@ -509,6 +538,22 @@ function render(){
 
   ctx.fillStyle = "#111";
   ctx.fillRect(0,0,W,H);
+  
+// ✅ Limita el camp azimutal al rang real del perfil
+if (CURRENT_PROFILE) {
+  const profMin = CURRENT_PROFILE.az0;
+  const profMax = CURRENT_PROFILE.az0 + (CURRENT_PROFILE.alt.length - 1) * CURRENT_PROFILE.daz;
+
+  VIEW.azMin = Math.max(VIEW.azMin, profMin);
+  VIEW.azMax = Math.min(VIEW.azMax, profMax);
+
+  // seguretat extra
+  if (VIEW.azMax - VIEW.azMin < 10) {
+    const mid = (profMin + profMax) / 2;
+    VIEW.azMin = Math.floor(Math.max(profMin, mid - 5));
+    VIEW.azMax = Math.ceil(Math.min(profMax, mid + 5));
+  }
+}
 
   drawGrid(W,H);
   drawHorizon(W,H, CURRENT_PROFILE);
