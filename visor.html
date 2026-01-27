@@ -252,9 +252,8 @@ function drawSunDiscs(W, H, marks){
   // radi solar aproximat en graus
   const sunRadiusDeg = 0.266; // ~16 arcmin
 
-const rPx = sunRadiusDeg * (plotH / (VIEW.altMax - VIEW.altMin));
-ctx.arc(x, y, Math.max(2, rPx), 0, Math.PI*2);
-
+  const plotH = (H - VIEW.padding.t - VIEW.padding.b);
+  const rPx = sunRadiusDeg * (plotH / (VIEW.altMax - VIEW.altMin));
 
   ctx.save();
   ctx.lineWidth = 2;
@@ -271,9 +270,9 @@ ctx.arc(x, y, Math.max(2, rPx), 0, Math.PI*2);
     ctx.strokeStyle = m.color || "rgba(255,255,255,0.9)";
     ctx.fillStyle = ctx.strokeStyle;
 
-    // cercle (disc)
+    // cercle (disc) a escala real (vertical)
     ctx.beginPath();
-   ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.arc(x, y, Math.max(2, rPx), 0, Math.PI*2);
     ctx.stroke();
 
     // punt central
@@ -520,6 +519,9 @@ const refEndAz   = (sunSetPt && Number.isFinite(sunSetPt.az)) ? sunSetPt.az : su
 
 VIEW.azMin = Math.floor(refStartAz - 1);
 VIEW.azMax = Math.ceil(refEndAz + 1);
+  
+// ✅ camp base (mínim) que NO volem reduir mai
+const BASE_AZ = { min: VIEW.azMin, max: VIEW.azMax };
 
 // seguretat: evita un camp massa estret
 if (VIEW.azMax - VIEW.azMin < 10) {
@@ -540,23 +542,37 @@ function render(){
   ctx.fillStyle = "#111";
   ctx.fillRect(0,0,W,H);
   
-// ✅ Limita el camp azimutal al rang real del perfil (SENSE modificar VIEW permanentment)
-let azMin = VIEW.azMin;
-let azMax = VIEW.azMax;
+// ✅ camp d'azimut adaptatiu segons aspect ratio (mòbil = base; pantalles amples = més horitzó)
+let azMin = BASE_AZ.min;
+let azMax = BASE_AZ.max;
 
+const baseSpan = BASE_AZ.max - BASE_AZ.min;
+const center = (BASE_AZ.min + BASE_AZ.max) / 2;
+
+// aspect ratio de referència "mòbil"
+const BASE_ASPECT = 9 / 16;
+const aspect = W / H;
+
+// si és més ample que el mòbil, amplia span proporcionalment
+if (aspect > BASE_ASPECT) {
+  const factor = Math.min(2.0, aspect / BASE_ASPECT);  // límit per no obrir massa
+  const span = baseSpan * factor;
+  azMin = center - span / 2;
+  azMax = center + span / 2;
+}
+
+// clamp al rang real del perfil
 if (CURRENT_PROFILE) {
   const profMin = CURRENT_PROFILE.az0;
   const profMax = CURRENT_PROFILE.az0 + (CURRENT_PROFILE.alt.length - 1) * CURRENT_PROFILE.daz;
-
   azMin = Math.max(azMin, profMin);
   azMax = Math.min(azMax, profMax);
+}
 
-  // seguretat extra
-  if (azMax - azMin < 10) {
-    const mid = (profMin + profMax) / 2;
-    azMin = Math.floor(Math.max(profMin, mid - 5));
-    azMax = Math.ceil(Math.min(profMax, mid + 5));
-  }
+// seguretat: mai més estret que el base
+if (azMax - azMin < baseSpan) {
+  azMin = BASE_AZ.min;
+  azMax = BASE_AZ.max;
 }
 
 // aplica azMin/azMax només per aquest render
