@@ -252,8 +252,9 @@ function drawSunDiscs(W, H, marks){
   // radi solar aproximat en graus
   const sunRadiusDeg = 0.266; // ~16 arcmin
 
-  const plotH = (H - VIEW.padding.t - VIEW.padding.b);
-  const rPx = sunRadiusDeg * (plotH / (VIEW.altMax - VIEW.altMin));
+const rPx = sunRadiusDeg * (plotH / (VIEW.altMax - VIEW.altMin));
+ctx.arc(x, y, Math.max(2, rPx), 0, Math.PI*2);
+
 
   ctx.save();
   ctx.lineWidth = 2;
@@ -272,7 +273,7 @@ function drawSunDiscs(W, H, marks){
 
     // cercle (disc)
     ctx.beginPath();
-    ctx.arc(x, y, Math.max(2, rPx), 0, Math.PI*2);
+   ctx.arc(x, y, r, 0, Math.PI*2);
     ctx.stroke();
 
     // punt central
@@ -575,8 +576,33 @@ VIEW.azMax = oldMax;
 
   if(CURRENT_PROFILE && sunAtCenter){
    const hHor = horizonAtAz(CURRENT_PROFILE, sunAtCenter.az);
+const SUN_R_DEG = 0.266;
+
 const delta = (hHor==null) ? null : (sunAtCenter.alt - hHor);
-    const status = (delta==null) ? "—" : (delta > 0.3 ? "✅ Visible" : (delta > 0 ? "⚠️ Just" : "❌ Tapat"));
+
+let status = "—";
+let frac = null;
+
+if (delta != null) {
+  if (delta >= SUN_R_DEG) {
+    status = "✅ Visible (100%)";
+    frac = 1;
+  } else if (delta <= -SUN_R_DEG) {
+    status = "❌ Tapat (0%)";
+    frac = 0;
+  } else {
+    // parcial: fracció visible del disc (aprox per segment circular)
+    const d = delta;      // graus: centre respecte a la “línia” d’horitzó
+    const R = SUN_R_DEG;
+
+    // Àrea visible (disc tallat per una recta): A = R^2*acos(-d/R) + d*sqrt(R^2-d^2)
+    const A = R*R * Math.acos(-d/R) + d * Math.sqrt(R*R - d*d);
+    frac = A / (Math.PI * R*R);
+
+    const pct = Math.round(frac * 100);
+    status = `⚠️ Parcial (${pct}%)`;
+  }
+}
     hud.textContent =
       `Az ${sunAtCenter.az.toFixed(1)}° · Sol ${sunAtCenter.alt.toFixed(2)}° · Horitzó ${hHor?.toFixed(2)}° · Δ ${delta?.toFixed(2)}° · ${status}`;
   }else{
