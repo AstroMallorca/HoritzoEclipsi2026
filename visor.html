@@ -415,7 +415,7 @@ const OBS = new Astronomy.Observer(PARAMS.lat, PARAMS.lon, PARAMS.alt);
 const dayStartUTC = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 0, 0, 0));
 // const dayStartTime = Astronomy.MakeTime(dayStartUTC);  // ja no cal per aquesta crida
 
-const ECL = Astronomy.SearchLocalSolarEclipse(OBS, dayStartUTC);
+const ECL = Astronomy.SearchLocalSolarEclipse(dayStartUTC, OBS);
 
 const dayMidUTC  = new Date(Date.UTC(ymd.y, ymd.mo - 1, ymd.d, 12, 0, 0));
 // const dayMidTime = Astronomy.MakeTime(dayMidUTC);      // ja no cal per aquesta crida
