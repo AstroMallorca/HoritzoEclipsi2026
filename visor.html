@@ -127,6 +127,10 @@ const hud = document.getElementById("hud");
 let CURRENT_PROFILE = null;
 let BASE_AZ = null;
   let PLOT = null;   // ✅ rectangle real de dibuix amb escala 1:1
+  let C1_AZ = null;
+let PEAK_AZ = null;
+let SET_AZ = null;
+
 
 
 /* ============
@@ -521,6 +525,10 @@ function normalizeProfile(p){
 const sunSetPt = (sunSetTime && sunSetTime.time)
   ? sunHorAtAstroTime(sunSetTime.time, OBS)
   : null;
+// === AZIMUTS CLAU PER AL LAYOUT ===
+C1_AZ   = (c1Pt   && Number.isFinite(c1Pt.az))   ? c1Pt.az   : null;
+PEAK_AZ = (peakPt && Number.isFinite(peakPt.az)) ? peakPt.az : null;
+SET_AZ  = (sunSetPt && Number.isFinite(sunSetPt.az)) ? sunSetPt.az : null;
 
 const refStartAz = (c1Pt && Number.isFinite(c1Pt.az)) ? c1Pt.az : sunPts[0].az;
 const refEndAz   = (sunSetPt && Number.isFinite(sunSetPt.az)) ? sunSetPt.az : sunPts[sunPts.length-1].az;
@@ -551,32 +559,74 @@ function render(){
   ctx.fillStyle = "#111";
   ctx.fillRect(0,0,W,H);
   
-  // ✅ mantenim el teu rang base (no l'alteram segons pantalla)
-  const oldMin = VIEW.azMin, oldMax = VIEW.azMax;
-  VIEW.azMin = BASE_AZ.min;
-  VIEW.azMax = BASE_AZ.max;
+// Guardam l'antic (per restaurar al final)
+const oldMin = VIEW.azMin, oldMax = VIEW.azMax;
 
-  // ✅ Rectangle de dibuix amb escala 1:1 (1°X = 1°Y)
-  const azSpan  = (VIEW.azMax - VIEW.azMin);
-  const altSpan = (VIEW.altMax - VIEW.altMin);
+// === 1) Definim finestra d'azimut "intel·ligent" per omplir el mòbil ===
+const availW = W - VIEW.padding.l - VIEW.padding.r;
+const availH = H - VIEW.padding.t - VIEW.padding.b;
 
-  const availW = W - VIEW.padding.l - VIEW.padding.r;
-  const availH = H - VIEW.padding.t - VIEW.padding.b;
+const altSpan = (VIEW.altMax - VIEW.altMin);
 
-  const pxPerDeg = Math.min(availW / azSpan, availH / altSpan);
+// Anchor esquerra: C1 ha d'estar com a màxim a +2°
+const c1 = (C1_AZ != null) ? C1_AZ : (BASE_AZ ? BASE_AZ.min : VIEW.azMin);
+let azMin = c1 - 2;
 
-  const realPlotW = pxPerDeg * azSpan;
-  const realPlotH = pxPerDeg * altSpan;
+// Quants graus "caben" si prioritzam aprofitar l'altura (1:1):
+// pxPerDegY = availH / altSpan  => spanX = availW / pxPerDegY
+let span = (availW * altSpan) / Math.max(1, availH);
 
-  const extraX = (availW - realPlotW) / 2;
-  const extraY = (availH - realPlotH) / 2;
+// seguretat: no volem finestres ridícules
+span = Math.max(span, 10);
 
-  PLOT = {
-    x0: VIEW.padding.l + extraX,
-    x1: VIEW.padding.l + extraX + realPlotW,
-    y1: VIEW.padding.t + extraY,         // top
-    y0: VIEW.padding.t + extraY + realPlotH  // bottom
-  };
+// asseguram que entra el màxim i (si existeix) la posta
+if (PEAK_AZ != null) span = Math.max(span, (PEAK_AZ + 2) - azMin);
+if (SET_AZ  != null) span = Math.max(span, (SET_AZ  + 1) - azMin);
+
+let azMax = azMin + span;
+
+// clamp al rang real del perfil, si el tenim
+if (CURRENT_PROFILE) {
+  const profMin = CURRENT_PROFILE.az0;
+  const profMax = CURRENT_PROFILE.az0 + (CURRENT_PROFILE.alt.length - 1) * CURRENT_PROFILE.daz;
+
+  // clamp mantenint azMin ancorat tant com es pugui
+  if (azMin < profMin) {
+    const shift = profMin - azMin;
+    azMin += shift;
+    azMax += shift;
+  }
+  if (azMax > profMax) {
+    azMax = profMax;
+    // si el clamp ens “menja” massa, ajustam azMin però intentant mantenir C1 prop de l'esquerra
+    azMin = Math.max(profMin, azMax - span);
+  }
+}
+
+// Apliquem la finestra d'aquest render
+VIEW.azMin = azMin;
+VIEW.azMax = azMax;
+
+// === 2) Rectangle de dibuix amb escala 1:1 (1°X = 1°Y) ===
+const azSpan = (VIEW.azMax - VIEW.azMin);
+
+// px/deg real: el limita el costat més restrictiu (aquí ja hem triat span per omplir mòbil,
+// però si hem ampliat span per incloure posta/màxim, pot passar a limitar l'ample)
+const pxPerDeg = Math.min(availW / azSpan, availH / altSpan);
+
+const realPlotW = pxPerDeg * azSpan;
+const realPlotH = pxPerDeg * altSpan;
+
+const extraX = (availW - realPlotW) / 2;
+const extraY = (availH - realPlotH) / 2;
+
+PLOT = {
+  x0: VIEW.padding.l + extraX,
+  x1: VIEW.padding.l + extraX + realPlotW,
+  y1: VIEW.padding.t + extraY,
+  y0: VIEW.padding.t + extraY + realPlotH
+};
+
 
 drawGrid(W,H);
 drawHorizon(W,H, CURRENT_PROFILE);
