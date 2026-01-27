@@ -252,12 +252,17 @@ const y = mapY(p.alt);
 }
 function drawSunDiscs(W, H, marks){
   if(!marks || !marks.length) return;
+  if(!PLOT) return; // encara no s'ha calculat el rectangle de dibuix
 
   // radi solar aproximat en graus
   const sunRadiusDeg = 0.266; // ~16 arcmin
 
-  const plotH = (H - VIEW.padding.t - VIEW.padding.b);
-  const rPx = sunRadiusDeg * (plotH / (VIEW.altMax - VIEW.altMin));
+  // ✅ píxels per grau (ha de ser 1:1). Ho traiem del PLOT real.
+  const pxPerDegY = (PLOT.y0 - PLOT.y1) / (VIEW.altMax - VIEW.altMin);
+  // (equivalent en X: (PLOT.x1-PLOT.x0)/(VIEW.azMax-VIEW.azMin))
+
+  // ✅ radi del Sol en píxels amb la mateixa escala que horitzó/camí
+  const rPx = sunRadiusDeg * pxPerDegY;
 
   ctx.save();
   ctx.lineWidth = 2;
@@ -268,23 +273,22 @@ function drawSunDiscs(W, H, marks){
   for(const m of marks){
     if(!inViewAz(m.az) || !inViewAlt(m.alt)) continue;
 
-   const x = mapX(m.az);
-const y = mapY(m.alt);
+    const x = mapX(m.az);
+    const y = mapY(m.alt);
 
     ctx.strokeStyle = m.color || "rgba(255,255,255,0.9)";
     ctx.fillStyle = ctx.strokeStyle;
 
-    // cercle (disc) a escala real (vertical)
+    // disc a escala real
     ctx.beginPath();
     ctx.arc(x, y, Math.max(2, rPx), 0, Math.PI*2);
     ctx.stroke();
 
-    // punt central
+    // punt central (això el deixo fix perquè sigui visible sempre)
     ctx.beginPath();
     ctx.arc(x, y, 2.5, 0, Math.PI*2);
     ctx.fill();
 
-    // etiqueta
     if(m.label){
       ctx.fillText(m.label, x + 10, y);
     }
