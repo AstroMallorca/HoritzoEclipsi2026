@@ -539,26 +539,38 @@ function render(){
   ctx.fillStyle = "#111";
   ctx.fillRect(0,0,W,H);
   
-// ✅ Limita el camp azimutal al rang real del perfil
+// ✅ Limita el camp azimutal al rang real del perfil (SENSE modificar VIEW permanentment)
+let azMin = VIEW.azMin;
+let azMax = VIEW.azMax;
+
 if (CURRENT_PROFILE) {
   const profMin = CURRENT_PROFILE.az0;
   const profMax = CURRENT_PROFILE.az0 + (CURRENT_PROFILE.alt.length - 1) * CURRENT_PROFILE.daz;
 
-  VIEW.azMin = Math.max(VIEW.azMin, profMin);
-  VIEW.azMax = Math.min(VIEW.azMax, profMax);
+  azMin = Math.max(azMin, profMin);
+  azMax = Math.min(azMax, profMax);
 
   // seguretat extra
-  if (VIEW.azMax - VIEW.azMin < 10) {
+  if (azMax - azMin < 10) {
     const mid = (profMin + profMax) / 2;
-    VIEW.azMin = Math.floor(Math.max(profMin, mid - 5));
-    VIEW.azMax = Math.ceil(Math.min(profMax, mid + 5));
+    azMin = Math.floor(Math.max(profMin, mid - 5));
+    azMax = Math.ceil(Math.min(profMax, mid + 5));
   }
 }
 
-  drawGrid(W,H);
-  drawHorizon(W,H, CURRENT_PROFILE);
-  drawSunPath(W,H, sunPts, VIEW.colSunPath);
-  drawSunDiscs(W, H, MARKS);
+// aplica azMin/azMax només per aquest render
+const oldMin = VIEW.azMin, oldMax = VIEW.azMax;
+VIEW.azMin = azMin; 
+VIEW.azMax = azMax;
+
+drawGrid(W,H);
+drawHorizon(W,H, CURRENT_PROFILE);
+drawSunPath(W,H, sunPts, VIEW.colSunPath);
+drawSunDiscs(W, H, MARKS);
+
+// restaura valors originals
+VIEW.azMin = oldMin; 
+VIEW.azMax = oldMax;
   
 
   if(CURRENT_PROFILE && sunAtCenter){
