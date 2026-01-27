@@ -529,14 +529,12 @@ if (VIEW.azMax - VIEW.azMin < 10) {
   VIEW.azMin = Math.floor(mid - 5);
   VIEW.azMax = Math.ceil(mid + 5);
 }
+let BASE_AZ = null;
 
 /* ============
    RENDER
    ============ */
 let CURRENT_PROFILE = null;
-  let BASE_AZ = null;
-let BASE_PX_PER_DEG = null;
-
 
 function render(){
   const {w:W,h:H} = resizeCanvas();
@@ -555,13 +553,12 @@ const plotH = (H - VIEW.padding.t - VIEW.padding.b);
 const baseSpan = BASE_AZ.max - BASE_AZ.min;
 const center = (BASE_AZ.min + BASE_AZ.max) / 2;
 
-// defineix px/° una sola vegada (a la primera execució)
-if (BASE_PX_PER_DEG == null) {
-  BASE_PX_PER_DEG = plotW / baseSpan;
-}
+// ✅ Fixem l’escala amb l’eix vertical (així NO es deforma)
+const pxPerDegY = plotH / (VIEW.altMax - VIEW.altMin);
 
-// en funció de l’amplada actual, quants graus podem mostrar mantenint la mateixa escala?
-let span = plotW / BASE_PX_PER_DEG;
+// quants graus d'azimut caben mantenint la mateixa escala que l'altitud?
+let span = plotW / pxPerDegY;
+
 
 // mai més estret que el base
 if (span < baseSpan) span = baseSpan;
