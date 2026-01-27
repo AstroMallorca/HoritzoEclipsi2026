@@ -126,6 +126,8 @@ const hud = document.getElementById("hud");
 // ✅ globals (UNA sola vegada)
 let CURRENT_PROFILE = null;
 let BASE_AZ = null;
+  let PLOT = null;   // ✅ rectangle real de dibuix amb escala 1:1
+
 
 /* ============
    HELPERS
@@ -139,20 +141,19 @@ function resizeCanvas(){
   }
   return {w,h};
 }
-function mapX(az, W){
-  const {l,r} = VIEW.padding;
-  const x0 = l;
-  const x1 = W - r;
+function mapX(az){
+  const x0 = PLOT.x0;
+  const x1 = PLOT.x1;
   const t = (az - VIEW.azMin) / (VIEW.azMax - VIEW.azMin);
   return x0 + t * (x1 - x0);
 }
-function mapY(alt, H){
-  const {t,b} = VIEW.padding;
-  const y0 = H - b;
-  const y1 = t;
+function mapY(alt){
+  const y0 = PLOT.y0; // bottom
+  const y1 = PLOT.y1; // top
   const tt = (alt - VIEW.altMin) / (VIEW.altMax - VIEW.altMin);
   return y0 - tt * (y0 - y1);
 }
+
 function inViewAz(az){ return az >= VIEW.azMin && az <= VIEW.azMax; }
 function inViewAlt(alt){ return alt >= VIEW.altMin && alt <= VIEW.altMax; }
 
@@ -161,12 +162,12 @@ function drawGrid(W,H){
   ctx.lineWidth = 1;
 
   for(let az = Math.ceil(VIEW.azMin/VIEW.gridAzStep)*VIEW.gridAzStep; az <= VIEW.azMax; az += VIEW.gridAzStep){
-    const x = mapX(az, W);
+    const x = mapX(az);
     const bold = (az % 20 === 0);
     ctx.strokeStyle = bold ? VIEW.colGridBold : VIEW.colGrid;
     ctx.beginPath();
-    ctx.moveTo(x, VIEW.padding.t);
-    ctx.lineTo(x, H - VIEW.padding.b);
+   ctx.moveTo(x, PLOT.y1);
+ctx.lineTo(x, PLOT.y0);
     ctx.stroke();
 
     ctx.fillStyle = VIEW.colText;
@@ -177,12 +178,12 @@ function drawGrid(W,H){
   }
 
   for(let alt = Math.ceil(VIEW.altMin/VIEW.gridAltStep)*VIEW.gridAltStep; alt <= VIEW.altMax; alt += VIEW.gridAltStep){
-    const y = mapY(alt, H);
+    const y = mapY(alt);
     const bold = (alt % 10 === 0);
     ctx.strokeStyle = bold ? VIEW.colGridBold : VIEW.colGrid;
     ctx.beginPath();
-    ctx.moveTo(VIEW.padding.l, y);
-    ctx.lineTo(W - VIEW.padding.r, y);
+ ctx.moveTo(PLOT.x0, y);
+ctx.lineTo(PLOT.x1, y);
     ctx.stroke();
 
     ctx.fillStyle = VIEW.colText;
@@ -209,8 +210,8 @@ function drawHorizon(W,H, profile){
     const az = az0 + i*daz;
     if(!inViewAz(az)) continue;
     const a = alt[i];
-    const x = mapX(az, W);
-    const y = mapY(a, H);
+ const x = mapX(az);
+const y = mapY(a);
     if(!started){ ctx.moveTo(x,y); started=true; }
     else ctx.lineTo(x,y);
   }
@@ -234,8 +235,8 @@ function drawSunPath(W, H, points, color){
     if(!ok){ prev = null; continue; }
     if(prev && Math.abs(p.az - prev.az) > 5) prev = null;
 
-    const x = mapX(p.az, W);
-    const y = mapY(p.alt, H);
+   const x = mapX(p.az);
+const y = mapY(p.alt);
 
     if(!started || !prev){
       ctx.moveTo(x, y);
@@ -267,8 +268,8 @@ function drawSunDiscs(W, H, marks){
   for(const m of marks){
     if(!inViewAz(m.az) || !inViewAlt(m.alt)) continue;
 
-    const x = mapX(m.az, W);
-    const y = mapY(m.alt, H);
+   const x = mapX(m.az);
+const y = mapY(m.alt);
 
     ctx.strokeStyle = m.color || "rgba(255,255,255,0.9)";
     ctx.fillStyle = ctx.strokeStyle;
@@ -546,47 +547,32 @@ function render(){
   ctx.fillStyle = "#111";
   ctx.fillRect(0,0,W,H);
   
-// ✅ camp d'azimut amb ESCALA FIXA (mateixa forma sempre)
-let azMin = BASE_AZ.min;
-let azMax = BASE_AZ.max;
+  // ✅ mantenim el teu rang base (no l'alteram segons pantalla)
+  const oldMin = VIEW.azMin, oldMax = VIEW.azMax;
+  VIEW.azMin = BASE_AZ.min;
+  VIEW.azMax = BASE_AZ.max;
 
-const plotW = (W - VIEW.padding.l - VIEW.padding.r);
-const plotH = (H - VIEW.padding.t - VIEW.padding.b);
+  // ✅ Rectangle de dibuix amb escala 1:1 (1°X = 1°Y)
+  const azSpan  = (VIEW.azMax - VIEW.azMin);
+  const altSpan = (VIEW.altMax - VIEW.altMin);
 
-const baseSpan = BASE_AZ.max - BASE_AZ.min;
-const center = (BASE_AZ.min + BASE_AZ.max) / 2;
+  const availW = W - VIEW.padding.l - VIEW.padding.r;
+  const availH = H - VIEW.padding.t - VIEW.padding.b;
 
-// ✅ Fixem l’escala amb l’eix vertical (així NO es deforma)
-const pxPerDegY = plotH / (VIEW.altMax - VIEW.altMin);
+  const pxPerDeg = Math.min(availW / azSpan, availH / altSpan);
 
-// quants graus d'azimut caben mantenint la mateixa escala que l'altitud?
-let span = plotW / pxPerDegY;
+  const realPlotW = pxPerDeg * azSpan;
+  const realPlotH = pxPerDeg * altSpan;
 
+  const extraX = (availW - realPlotW) / 2;
+  const extraY = (availH - realPlotH) / 2;
 
-// mai més estret que el base
-if (span < baseSpan) span = baseSpan;
-
-azMin = center - span / 2;
-azMax = center + span / 2;
-
-// clamp al rang real del perfil
-if (CURRENT_PROFILE) {
-  const profMin = CURRENT_PROFILE.az0;
-  const profMax = CURRENT_PROFILE.az0 + (CURRENT_PROFILE.alt.length - 1) * CURRENT_PROFILE.daz;
-  azMin = Math.max(azMin, profMin);
-  azMax = Math.min(azMax, profMax);
-
-  // seguretat: si el clamp estreny massa, torna al base
-  if (azMax - azMin < baseSpan) {
-    azMin = Math.max(BASE_AZ.min, profMin);
-    azMax = Math.min(BASE_AZ.max, profMax);
-  }
-}
-
-// aplica azMin/azMax només per aquest render
-const oldMin = VIEW.azMin, oldMax = VIEW.azMax;
-VIEW.azMin = azMin; 
-VIEW.azMax = azMax;
+  PLOT = {
+    x0: VIEW.padding.l + extraX,
+    x1: VIEW.padding.l + extraX + realPlotW,
+    y1: VIEW.padding.t + extraY,         // top
+    y0: VIEW.padding.t + extraY + realPlotH  // bottom
+  };
 
 drawGrid(W,H);
 drawHorizon(W,H, CURRENT_PROFILE);
