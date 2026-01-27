@@ -521,7 +521,7 @@ VIEW.azMin = Math.floor(refStartAz - 1);
 VIEW.azMax = Math.ceil(refEndAz + 1);
   
 // ✅ camp base (mínim) que NO volem reduir mai
-const BASE_AZ = { min: VIEW.azMin, max: VIEW.azMax };
+BASE_AZ = { min: VIEW.azMin, max: VIEW.azMax };
 
 // seguretat: evita un camp massa estret
 if (VIEW.azMax - VIEW.azMin < 10) {
@@ -534,6 +534,9 @@ if (VIEW.azMax - VIEW.azMin < 10) {
    RENDER
    ============ */
 let CURRENT_PROFILE = null;
+  let BASE_AZ = null;
+let BASE_PX_PER_DEG = null;
+
 
 function render(){
   const {w:W,h:H} = resizeCanvas();
@@ -542,24 +545,29 @@ function render(){
   ctx.fillStyle = "#111";
   ctx.fillRect(0,0,W,H);
   
-// ✅ camp d'azimut adaptatiu segons aspect ratio (mòbil = base; pantalles amples = més horitzó)
+// ✅ camp d'azimut amb ESCALA FIXA (mateixa forma sempre)
 let azMin = BASE_AZ.min;
 let azMax = BASE_AZ.max;
+
+const plotW = (W - VIEW.padding.l - VIEW.padding.r);
+const plotH = (H - VIEW.padding.t - VIEW.padding.b);
 
 const baseSpan = BASE_AZ.max - BASE_AZ.min;
 const center = (BASE_AZ.min + BASE_AZ.max) / 2;
 
-// iPhone / mòbil modern (aprox 19.5:9)
-const BASE_ASPECT = 9 / 19.5;   // ≈ 0.4615
-const aspect = aspectPlot;
-
-// si és més ample que el mòbil, amplia span proporcionalment
-if (aspect > BASE_ASPECT) {
-  const factor = Math.min(2.0, aspect / BASE_ASPECT);  // límit per no obrir massa
-  const span = baseSpan * factor;
-  azMin = center - span / 2;
-  azMax = center + span / 2;
+// defineix px/° una sola vegada (a la primera execució)
+if (BASE_PX_PER_DEG == null) {
+  BASE_PX_PER_DEG = plotW / baseSpan;
 }
+
+// en funció de l’amplada actual, quants graus podem mostrar mantenint la mateixa escala?
+let span = plotW / BASE_PX_PER_DEG;
+
+// mai més estret que el base
+if (span < baseSpan) span = baseSpan;
+
+azMin = center - span / 2;
+azMax = center + span / 2;
 
 // clamp al rang real del perfil
 if (CURRENT_PROFILE) {
@@ -567,12 +575,12 @@ if (CURRENT_PROFILE) {
   const profMax = CURRENT_PROFILE.az0 + (CURRENT_PROFILE.alt.length - 1) * CURRENT_PROFILE.daz;
   azMin = Math.max(azMin, profMin);
   azMax = Math.min(azMax, profMax);
-}
 
-// seguretat: mai més estret que el base
-if (azMax - azMin < baseSpan) {
-  azMin = BASE_AZ.min;
-  azMax = BASE_AZ.max;
+  // seguretat: si el clamp estreny massa, torna al base
+  if (azMax - azMin < baseSpan) {
+    azMin = Math.max(BASE_AZ.min, profMin);
+    azMax = Math.min(BASE_AZ.max, profMax);
+  }
 }
 
 // aplica azMin/azMax només per aquest render
