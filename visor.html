@@ -519,7 +519,8 @@ const refEndAz   = (sunSetPt && Number.isFinite(sunSetPt.az)) ? sunSetPt.az : su
 
 VIEW.azMin = Math.floor(refStartAz - 1);
 VIEW.azMax = Math.ceil(refEndAz + 1);
-  
+
+  let BASE_AZ = null;
 // ✅ camp base (mínim) que NO volem reduir mai
 BASE_AZ = { min: VIEW.azMin, max: VIEW.azMax };
 
@@ -529,11 +530,11 @@ if (VIEW.azMax - VIEW.azMin < 10) {
   VIEW.azMin = Math.floor(mid - 5);
   VIEW.azMax = Math.ceil(mid + 5);
 }
-let BASE_AZ = null;
 
 /* ============
    RENDER
    ============ */
+  if (!BASE_AZ) return;
 let CURRENT_PROFILE = null;
 
 function render(){
