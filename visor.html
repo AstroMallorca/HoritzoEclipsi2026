@@ -549,9 +549,9 @@ let azMax = BASE_AZ.max;
 const baseSpan = BASE_AZ.max - BASE_AZ.min;
 const center = (BASE_AZ.min + BASE_AZ.max) / 2;
 
-// aspect ratio de referència "mòbil"
-const BASE_ASPECT = 9 / 16;
-const aspect = W / H;
+// iPhone / mòbil modern (aprox 19.5:9)
+const BASE_ASPECT = 9 / 19.5;   // ≈ 0.4615
+const aspect = aspectPlot;
 
 // si és més ample que el mòbil, amplia span proporcionalment
 if (aspect > BASE_ASPECT) {
