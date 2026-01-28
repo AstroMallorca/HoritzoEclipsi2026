@@ -414,22 +414,6 @@ function initMapIfNeeded(){
       }
     });
   });
-btnMap.addEventListener("click", () => {
-  openMapModal();
-  initMapIfNeeded();
-});
-
-mapClose.addEventListener("click", closeMapModal);
-mapCancel.addEventListener("click", closeMapModal);
-
-// clic fora del quadre = tanca
-mapModal.addEventListener("click", (e) => {
-  if(e.target === mapModal) closeMapModal();
-});
-
-mapOk.addEventListener("click", () => {
-  if(picked.lat == null || picked.lon == null) return;
-
   // Omplim inputs manuals
   latEl.value = picked.lat.toFixed(6);
   lonEl.value = picked.lon.toFixed(6);
@@ -474,10 +458,6 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
   });
 }
-</script>
-  <script>
-  // posa la teva API KEY aquí:
-  window.GMAPS_KEY = "TU_API_KEY";
 </script>
 
 <script async defer
