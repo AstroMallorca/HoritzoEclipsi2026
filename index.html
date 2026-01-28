@@ -207,7 +207,33 @@ const centerUtcEl = document.getElementById("centerUtc");
   const lonEl = document.getElementById("lon");
   const altEl = document.getElementById("alt");
   const rangeEl = document.getElementById("rangeKm");
+if (!btnMap || !mapModal || !mapOk || !mapCancel || !mapClose || !mapInfo) {
+  console.warn("Mapa no inicialitzat: falta HTML del modal o el botó btnMap.");
+} else {
+  btnMap.addEventListener("click", () => {
+    openMapModal();
+    initMapIfNeeded();
+  });
 
+  mapClose.addEventListener("click", closeMapModal);
+  mapCancel.addEventListener("click", closeMapModal);
+
+  mapModal.addEventListener("click", (e) => {
+    if(e.target === mapModal) closeMapModal();
+  });
+
+  mapOk.addEventListener("click", () => {
+    if(picked.lat == null || picked.lon == null) return;
+    latEl.value = picked.lat.toFixed(6);
+    lonEl.value = picked.lon.toFixed(6);
+    altEl.value = String(Math.round(picked.alt ?? 0));
+    chosen = "manual";
+    manualBox.style.display = "block";
+    setStatus("Localització del mapa aplicada. Dades manuals OK.", true);
+    enableGoIfReady();
+    closeMapModal();
+  });
+}
   let chosen = null; // "gps" | "manual"
   let current = {lat:null, lon:null, alt:null};
 
