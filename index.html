@@ -125,6 +125,12 @@
 <script>
   const btnGPS = document.getElementById("btnGPS");
   const btnManual = document.getElementById("btnManual");
+  const btnMap = document.getElementById("btnMap");
+const mapModal = document.getElementById("mapModal");
+const mapClose = document.getElementById("mapClose");
+const mapCancel = document.getElementById("mapCancel");
+const mapOk = document.getElementById("mapOk");
+const mapInfo = document.getElementById("mapInfo");
   const btnGo = document.getElementById("btnGo");
   const manualBox = document.getElementById("manualBox");
   const statusEl = document.getElementById("status");
@@ -174,7 +180,107 @@ const centerUtcEl = document.getElementById("centerUtc");
     }
     btnGo.disabled = true;
   }
+let gmap = null;
+let gmarker = null;
+let picked = {lat:null, lon:null, alt:0};
 
+function openMapModal(){
+  mapModal.classList.remove("ocult");
+  mapModal.setAttribute("aria-hidden", "false");
+
+  // Si el mapa ja està creat, només recalculam el render dins el modal
+  if (gmap && window.google && google.maps) {
+    google.maps.event.trigger(gmap, "resize");
+    if (gmarker) gmap.setCenter(gmarker.getPosition());
+  }
+}
+
+function closeMapModal(){
+  mapModal.classList.add("ocult");
+  mapModal.setAttribute("aria-hidden", "true");
+}
+
+function updateMapInfo(){
+  mapInfo.textContent =
+    `lat ${picked.lat?.toFixed(6) ?? "—"}, lon ${picked.lon?.toFixed(6) ?? "—"}, alt ${Math.round(picked.alt ?? 0)} m`;
+}
+
+// (Opcional) intenta obtenir altitud via ElevationService (si tens l’API d’elevation activada)
+function tryElevation(lat, lon){
+  return new Promise(resolve => {
+    try{
+      if(!window.google || !google.maps) return resolve(null);
+      const svc = new google.maps.ElevationService();
+      svc.getElevationForLocations(
+        { locations: [{ lat, lng: lon }] },
+        (results, status) => {
+          const h = (status === "OK" && results && results[0]) ? results[0].elevation : null;
+          resolve(Number.isFinite(h) ? h : null);
+        }
+      );
+    }catch(e){
+      resolve(null);
+    }
+  });
+}
+
+async function setPicked(lat, lon){
+  picked.lat = lat;
+  picked.lon = lon;
+  picked.alt = 0;
+  updateMapInfo();
+
+  const h = await tryElevation(lat, lon);
+  if(Number.isFinite(h)){
+    picked.alt = h;
+    updateMapInfo();
+  }
+}
+
+function initMapIfNeeded(){
+  if(gmap) return;
+  if(!window.google || !google.maps){
+    mapInfo.textContent = "Google Maps no s'ha carregat (falta API key o script).";
+    return;
+  }
+
+  // punt inicial: si tens manual omplert, l’agafa; si no, usa la ubicació GPS si existeix; si no, Palma.
+  const vMan = validateManual();
+  const startLat = vMan.ok ? vMan.lat : (current.lat ?? 39.5733);
+  const startLon = vMan.ok ? vMan.lon : (current.lon ?? 2.6564);
+
+  gmap = new google.maps.Map(document.getElementById("gmap"), {
+    center: { lat: startLat, lng: startLon },
+    zoom: 12,
+    mapTypeId: "terrain",
+    streetViewControl: false,
+    fullscreenControl: false,
+    mapTypeControl: false
+  });
+
+  gmarker = new google.maps.Marker({
+    position: { lat: startLat, lng: startLon },
+    map: gmap,
+    draggable: true
+  });
+
+  setPicked(startLat, startLon);
+
+  gmap.addListener("click", async (e) => {
+    const lat = e.latLng.lat();
+    const lon = e.latLng.lng();
+    gmarker.setPosition({lat, lng: lon});
+    gmap.panTo({lat, lng: lon});
+    await setPicked(lat, lon);
+  });
+
+  gmarker.addListener("dragend", async () => {
+    const p = gmarker.getPosition();
+    const lat = p.lat();
+    const lon = p.lng();
+    await setPicked(lat, lon);
+  });
+}
   btnManual.addEventListener("click", () => {
     chosen = "manual";
     manualBox.style.display = "block";
@@ -216,7 +322,35 @@ const centerUtcEl = document.getElementById("centerUtc");
       }
     });
   });
+btnMap.addEventListener("click", () => {
+  openMapModal();
+  initMapIfNeeded();
+});
 
+mapClose.addEventListener("click", closeMapModal);
+mapCancel.addEventListener("click", closeMapModal);
+
+// clic fora del quadre = tanca
+mapModal.addEventListener("click", (e) => {
+  if(e.target === mapModal) closeMapModal();
+});
+
+mapOk.addEventListener("click", () => {
+  if(picked.lat == null || picked.lon == null) return;
+
+  // Omplim inputs manuals
+  latEl.value = picked.lat.toFixed(6);
+  lonEl.value = picked.lon.toFixed(6);
+  altEl.value = String(Math.round(picked.alt ?? 0));
+
+  // Ens posem en mode manual i mostrem la caixa
+  chosen = "manual";
+  manualBox.style.display = "block";
+  setStatus("Localització del mapa aplicada. Dades manuals OK.", true);
+  enableGoIfReady();
+
+  closeMapModal();
+});
   btnGo.addEventListener("click", () => {
     let lat, lon, alt, rangeKm;
 
@@ -248,6 +382,14 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
   });
 }
+</script>
+  <script>
+  // posa la teva API KEY aquí:
+  window.GMAPS_KEY = "TU_API_KEY";
+</script>
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=TU_API_KEY">
 </script>
 </body>
 </html>
