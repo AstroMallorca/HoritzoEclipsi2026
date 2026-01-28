@@ -171,7 +171,23 @@
     </div>
   </div>
 </div>
+<div id="mapModal" class="modal ocult" aria-hidden="true">
+  <div class="modalCard">
+    <div class="modalTop">
+      <div class="modalTitle">Selecciona localització</div>
+      <button id="mapClose" class="modalX">✕</button>
+    </div>
 
+    <div id="gmap" class="mapBox"></div>
+
+    <div class="mapInfo" id="mapInfo">Toca el mapa o arrossega el marcador.</div>
+
+    <div class="modalActions">
+      <button id="mapCancel">Cancel·lar</button>
+      <button class="primary" id="mapOk">Usar aquesta localització</button>
+    </div>
+  </div>
+</div>
 <script>
   const btnGPS = document.getElementById("btnGPS");
   const btnManual = document.getElementById("btnManual");
