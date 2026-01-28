@@ -56,6 +56,55 @@
     .ok{color:#7CFFB2}
     .bad{color:#ff6b6b}
     .sep{height:1px;background:rgba(255,255,255,.10);margin:12px 0;}
+    .modal{
+  position:fixed; inset:0;
+  background:rgba(0,0,0,.65);
+  display:flex; align-items:center; justify-content:center;
+  padding:14px;
+  z-index:9999;
+}
+.modal.ocult{ display:none; }
+
+.modalCard{
+  width:min(920px, 96vw);
+  height:min(780px, 92vh);
+  background:rgba(0,0,0,.90);
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.modalTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,.10);
+}
+.modalTitle{ font-weight:700; }
+.modalX{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:8px 10px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+.mapBox{ flex:1; min-height:280px; }
+.mapInfo{
+  padding:10px 12px;
+  font-size:14px;
+  color:var(--muted);
+  border-top:1px solid rgba(255,255,255,.10);
+}
+.modalActions{
+  display:flex;
+  gap:10px;
+  padding:12px;
+}
   </style>
 </head>
 <body>
