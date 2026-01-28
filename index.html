@@ -414,19 +414,7 @@ function initMapIfNeeded(){
       }
     });
   });
-  // Omplim inputs manuals
-  latEl.value = picked.lat.toFixed(6);
-  lonEl.value = picked.lon.toFixed(6);
-  altEl.value = String(Math.round(picked.alt ?? 0));
 
-  // Ens posem en mode manual i mostrem la caixa
-  chosen = "manual";
-  manualBox.style.display = "block";
-  setStatus("Localització del mapa aplicada. Dades manuals OK.", true);
-  enableGoIfReady();
-
-  closeMapModal();
-});
   btnGo.addEventListener("click", () => {
     let lat, lon, alt, rangeKm;
 
